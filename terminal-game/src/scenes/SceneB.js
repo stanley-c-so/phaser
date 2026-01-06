@@ -1,27 +1,11 @@
 import Phaser from 'phaser';
 
+import { MARGINS, TERMINAL_COLS, TERMINAL_ROWS, COLORS } from '../config/constants';
+import { initStyle } from '../utils/draw';
+
 export default class SceneB extends Phaser.Scene {
   constructor() {
     super('SceneB');
-  }
-
-  initStyle() {
-    // Create a hidden probe text with the exact same style as your terminal text
-    this.probeStyle = {
-      fontFamily: 'monospace',
-      fontSize: '20px',
-      color: '#00ff00',
-    };
-    this.probeText = this.add.text(0, 0, '', this.probeStyle).setVisible(false);
-    // Measure monospace char width using Phaser's own renderer
-    const samples = 200;
-    const TEST_CHAR = 'M';
-    this.probeText.setText(TEST_CHAR.repeat(samples));
-    const w = this.probeText.width;
-    this.cellW = w / samples;
-    // Measure line height using Phaser's own renderer
-    this.probeText.setText(`${TEST_CHAR}\n${TEST_CHAR}`);
-    this.cellH = this.probeText.height / 2;
   }
 
   create() {
@@ -34,13 +18,20 @@ export default class SceneB extends Phaser.Scene {
     })
 
     // --- "terminal" config ---
-    this.originX = 100;
-    this.originY = 100;
-    this.cols = 60;
-    this.rows = 20;
+    this.originX = MARGINS.left;
+    this.originY = MARGINS.top;
+    this.cols = TERMINAL_COLS;
+    this.rows = TERMINAL_ROWS;
 
-    this.initStyle();
-
+    const {
+      textStyle,
+      cellW,
+      cellH,
+    } = initStyle.bind(this)();
+    this.textStyle = textStyle;
+    this.cellW = cellW;
+    this.cellH = cellH;
+    
     this.cursorCol = 0;
     this.cursorRow = 0;
 
@@ -50,11 +41,11 @@ export default class SceneB extends Phaser.Scene {
     this.add.text(100, 50, 'SCENE B / TERMINAL (type; ENTER=nl, BACKSPACE=del)', {
       fontFamily: 'monospace',
       fontSize: '16px',
-      color: '#00ff00',
+      color: COLORS.TEXT,
     });
 
     // The text display
-    this.terminalText = this.add.text(this.originX, this.originY, '', this.probeStyle);
+    this.terminalText = this.add.text(this.originX, this.originY, '', this.textStyle);
 
     // Cursor square (drawn with Graphics)
     this.cursorGfx = this.add.graphics();

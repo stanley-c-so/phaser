@@ -1,14 +1,20 @@
 import Phaser from 'phaser';
 
+import { GAME_WIDTH, GAME_HEIGHT, COLORS } from './config/constants';
 import SceneA from './scenes/SceneA';
 import SceneB from './scenes/SceneB';
+import Map from './scenes/Map';
 
 const config = {
   type: Phaser.AUTO,
-  width: 1024,
-  height: 768,
-  backgroundColor: '#000000',
-  scene: [SceneA, SceneB],
+  width: GAME_WIDTH,
+  height: GAME_HEIGHT,
+  backgroundColor: COLORS.BG,
+  scene: [
+    Map,
+    SceneA,
+    SceneB,
+  ],
   scale: {
     // mode: Phaser.Scale.FIT,
     mode: Phaser.Scale.RESIZE,

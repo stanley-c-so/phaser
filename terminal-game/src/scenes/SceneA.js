@@ -1,15 +1,17 @@
 import Phaser from 'phaser';
 
+import { MARGINS, COLORS } from '../config/constants';
+
 export default class SceneA extends Phaser.Scene {
   constructor() {
     super('SceneA');
   }
 
   create() {
-    this.add.text(100, 100, 'SCENE A\n(press SPACE)', {
+    this.add.text(MARGINS.left, MARGINS.top, 'SCENE A\n(press SPACE)', {
       fontFamily: 'monospace',
       fontSize: '20px',
-      color: '#00ff00'
+      color: COLORS.TEXT,
     });
 
     this.input.keyboard.once('keydown-SPACE', () => {
