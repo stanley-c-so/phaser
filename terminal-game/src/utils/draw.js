@@ -1,10 +1,14 @@
 import {
-  GAME_WIDTH,
-  GAME_HEIGHT,
   MARGINS,
   FONT_SIZE,
   COLORS,
 } from '../config/constants';
+
+const DASH = "─";
+const TOP_LEFT = "┌";
+const TOP_RIGHT = "┐";
+const BOTTOM_LEFT = "└";
+const BOTTOM_RIGHT = "┘";
 
 export function initStyle() {
   const textStyle = {
@@ -28,13 +32,33 @@ export function initStyle() {
   };
 };
 
-export function borderText(cellW, cellH) {
+export function borderText(cellW, cellH, borderTitle) {
 
-  // console.log(`GAME_WIDTH ${GAME_WIDTH}`)
-  // console.log(`GAME_HEIGHT ${GAME_HEIGHT}`)
+  const drawAreaWidthInCells = Math.floor((this.scale.width - MARGINS.left - MARGINS.right) / cellW);
+  const drawAreaHeightInCells = Math.floor((this.scale.height - MARGINS.top - MARGINS.bottom) / cellH);
+
   // console.log(`cellW ${cellW}`)
   // console.log(`cellH ${cellH}`)
-
   
+  // console.log(`drawAreaWidthInCells ${drawAreaWidthInCells}`)
+  // console.log(`drawAreaHeightInCells ${drawAreaHeightInCells}`)
 
+  const topLine = TOP_LEFT
+    + DASH.repeat(Math.floor((drawAreaWidthInCells - borderTitle.length) / 2) - 1)
+    + borderTitle
+    + DASH.repeat(Math.ceil((drawAreaWidthInCells - borderTitle.length) / 2) - 1)
+    + TOP_RIGHT;
+  
+  const bottomLine = BOTTOM_LEFT
+    + DASH.repeat(drawAreaWidthInCells - 2)
+    + BOTTOM_RIGHT;
+
+  const lines = [];
+  lines.push(topLine);
+  for (let i = 0; i < drawAreaHeightInCells - 2; ++i) {
+    lines.push("|" + " ".repeat(drawAreaWidthInCells - 2) + "|");
+  }
+  lines.push(bottomLine);
+
+  return lines.join("\n");
 };
