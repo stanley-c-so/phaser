@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import Phaser from "phaser";
 
 import {
   MARGINS,
@@ -6,18 +6,18 @@ import {
   TERMINAL_ROWS,
   COLORS,
   TEXT_STYLE,
-} from '../config/constants';
+} from "../config/constants";
 
 export default class SceneB extends Phaser.Scene {
   constructor() {
-    super('SceneB');
+    super("SceneB");
   }
 
   create() {
 
-    this.input.keyboard.on('keydown', (e) => {
+    this.input.keyboard.on("keydown", (e) => {
       // Stop the browser from scrolling/doing shortcuts
-      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+      if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) {
         e.preventDefault()
       }
     })
@@ -32,32 +32,32 @@ export default class SceneB extends Phaser.Scene {
     this.cursorRow = 0;
 
     // Backing buffer: array of strings (lines)
-    this.lines = Array.from({ length: this.rows }, () => '');
+    this.lines = Array.from({ length: this.rows }, () => "");
 
-    this.add.text(100, 50, 'SCENE B / TERMINAL (type; ENTER=nl, BACKSPACE=del)', {
-      fontFamily: 'monospace',
-      fontSize: '16px',
+    this.add.text(100, 50, "SCENE B / TERMINAL (type; ENTER=nl, BACKSPACE=del)", {
+      fontFamily: "monospace",
+      fontSize: "16px",
       color: COLORS.TEXT,
     });
 
     // The text display
-    this.terminalText = this.add.text(this.originX, this.originY, '', TEXT_STYLE);
+    this.terminalText = this.add.text(this.originX, this.originY, "", TEXT_STYLE);
 
     // Cursor square (drawn with Graphics)
     this.cursorGfx = this.add.graphics();
 
     // Key handling
-    this.input.keyboard.on('keydown', (ev) => {
+    this.input.keyboard.on("keydown", (ev) => {
       // Ignore modifier-only keys
-      if (ev.key === 'Shift' || ev.key === 'Control' || ev.key === 'Alt' || ev.key === 'Meta') return;
+      if (ev.key === "Shift" || ev.key === "Control" || ev.key === "Alt" || ev.key === "Meta") return;
 
-      if (ev.key === 'Backspace') {
+      if (ev.key === "Backspace") {
         this.backspace();
         this.render();
         return;
       }
 
-      if (ev.key === 'Enter') {
+      if (ev.key === "Enter") {
         this.newline();
         this.render();
         return;
@@ -115,7 +115,7 @@ export default class SceneB extends Phaser.Scene {
 
   render() {
     // Render all lines as one block
-    this.terminalText.setText(this.lines.join('\n'));
+    this.terminalText.setText(this.lines.join("\n"));
     this.drawCursor();
   }
 

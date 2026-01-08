@@ -1,10 +1,10 @@
-import Phaser from 'phaser';
+import Phaser from "phaser";
 
-import { drawBorderBox } from '../utils/draw';
+import { drawBorderBox } from "../utils/draw";
 
 export default class Map extends Phaser.Scene {
   constructor() {
-    super('Map');
+    super("Map");
   }
 
   create() {

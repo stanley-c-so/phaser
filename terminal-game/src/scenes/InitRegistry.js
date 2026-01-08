@@ -1,14 +1,14 @@
-import Phaser from 'phaser';
+import Phaser from "phaser";
 
 import {
   MARGINS,
   FONT_SIZE,
   COLORS,
-} from '../config/constants';
+} from "../config/constants";
 
 export default class InitRegistry extends Phaser.Scene {
   constructor() {
-    super('InitRegistry');
+    super("InitRegistry");
   }
 
   create() {
@@ -16,7 +16,7 @@ export default class InitRegistry extends Phaser.Scene {
     // cellW
     // cellH
     const textStyle = {
-      fontFamily: 'monospace',
+      fontFamily: "monospace",
       fontSize: FONT_SIZE,
       color: COLORS.TEXT,
     };

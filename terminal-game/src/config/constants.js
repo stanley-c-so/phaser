@@ -23,7 +23,7 @@ export const COLORS = {
 };
 
 export const TEXT_STYLE = {
-  fontFamily: 'monospace',
+  fontFamily: "monospace",
   fontSize: FONT_SIZE,
   color: COLORS.TEXT,
 };

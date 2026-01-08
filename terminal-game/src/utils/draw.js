@@ -1,7 +1,7 @@
 import {
   MARGINS,
   TEXT_STYLE,
-} from '../config/constants';
+} from "../config/constants";
 
 const DASH = "─";
 const TOP_LEFT = "┌";
