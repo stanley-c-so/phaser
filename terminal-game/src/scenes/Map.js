@@ -1,11 +1,5 @@
 import Phaser from 'phaser';
 
-import {
-  MARGINS,
-  COLORS,
-  FONT_SIZE,
-  TEXT_STYLE,
-} from '../config/constants';
 import { drawBorderBox } from '../utils/draw';
 
 export default class Map extends Phaser.Scene {
