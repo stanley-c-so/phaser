@@ -33,9 +33,9 @@ export default class Map extends Phaser.Scene {
         {length: bufferHeightInCells},
         () => Array(bufferWidthInCells).fill("5")
       );
+      drawBuffer.bind(this)();
     }
 
-    drawBuffer.bind(this)();
 
   }
   
