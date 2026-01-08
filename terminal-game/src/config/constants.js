@@ -2,10 +2,10 @@
 // export const GAME_HEIGHT = 768;
 
 export const MARGINS = {
-  top: 100,
-  bottom: 100,
-  left: 100,
-  right: 100,
+  top: 80,
+  bottom: 80,
+  left: 200,
+  right: 200,
   // top: 0,
   // bottom: 0,
   // left: 0,
