@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 
 import { COLORS } from './config/constants';
+import InitRegistry from './scenes/InitRegistry';
 import SceneA from './scenes/SceneA';
 import SceneB from './scenes/SceneB';
 import Map from './scenes/Map';
@@ -9,6 +10,7 @@ const config = {
   type: Phaser.AUTO,
   backgroundColor: COLORS.BG,
   scene: [
+    InitRegistry,
     Map,
     SceneA,
     SceneB,
@@ -50,3 +52,6 @@ window.addEventListener('keydown', (e) => {
   // Optional: navigate away to a safe page
   // window.location.href = 'about:blank'
 }, { capture: true });
+
+game.scene.start("Map");
+// game.scene.start("SceneB");

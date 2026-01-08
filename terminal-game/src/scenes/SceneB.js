@@ -1,7 +1,12 @@
 import Phaser from 'phaser';
 
-import { MARGINS, TERMINAL_COLS, TERMINAL_ROWS, COLORS } from '../config/constants';
-import { initStyle } from '../utils/draw';
+import {
+  MARGINS,
+  TERMINAL_COLS,
+  TERMINAL_ROWS,
+  COLORS,
+  TEXT_STYLE,
+} from '../config/constants';
 
 export default class SceneB extends Phaser.Scene {
   constructor() {
@@ -22,15 +27,6 @@ export default class SceneB extends Phaser.Scene {
     this.originY = MARGINS.top;
     this.cols = TERMINAL_COLS;
     this.rows = TERMINAL_ROWS;
-
-    const {
-      textStyle,
-      cellW,
-      cellH,
-    } = initStyle.bind(this)();
-    this.textStyle = textStyle;
-    this.cellW = cellW;
-    this.cellH = cellH;
     
     this.cursorCol = 0;
     this.cursorRow = 0;
@@ -45,7 +41,7 @@ export default class SceneB extends Phaser.Scene {
     });
 
     // The text display
-    this.terminalText = this.add.text(this.originX, this.originY, '', this.textStyle);
+    this.terminalText = this.add.text(this.originX, this.originY, '', TEXT_STYLE);
 
     // Cursor square (drawn with Graphics)
     this.cursorGfx = this.add.graphics();
@@ -127,10 +123,10 @@ export default class SceneB extends Phaser.Scene {
     this.cursorGfx.clear();
     this.cursorGfx.lineStyle(2, 0x00ff00, 1);
 
-    const x = this.originX + this.cursorCol * this.cellW;
-    const y = this.originY + this.cursorRow * this.cellH;
+    const x = this.originX + this.cursorCol * this.registry.get("cellW");
+    const y = this.originY + this.cursorRow * this.registry.get("cellH");
 
     // Square cursor at "next character" position
-    this.cursorGfx.strokeRect(x, y, this.cellW, this.cellH);
+    this.cursorGfx.strokeRect(x, y, this.cellW, this.registry.get("cellH"));
   }
 };

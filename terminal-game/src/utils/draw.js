@@ -2,6 +2,7 @@ import {
   MARGINS,
   FONT_SIZE,
   COLORS,
+  TEXT_STYLE,
 } from '../config/constants';
 
 const DASH = "─";
@@ -12,38 +13,10 @@ const BOTTOM_RIGHT = "┘";
 const BRACKET_LEFT = "[";
 const BRACKET_RIGHT = "]";
 
-export function initStyle() {
-  const textStyle = {
-    fontFamily: 'monospace',
-    fontSize: FONT_SIZE,
-    color: COLORS.TEXT,
-  };
+export function drawBorderBox(borderTitle) {
 
-  const probeText = this.add.text(0, 0, "", textStyle).setVisible(false);
-  const samples = 200;
-  const probeChar = "M";
-  probeText.setText(probeChar.repeat(samples));
-  const cellW = probeText.width / samples;
-  probeText.setText(probeChar + "\n" + probeChar);
-  const cellH = probeText.height / 2;
-
-  return {
-    textStyle,
-    cellW,
-    cellH,
-  };
-};
-
-export function borderText(cellW, cellH, borderTitle) {
-
-  const drawAreaWidthInCells = Math.floor((this.scale.width - MARGINS.left - MARGINS.right) / cellW);
-  const drawAreaHeightInCells = Math.floor((this.scale.height - MARGINS.top - MARGINS.bottom) / cellH);
-
-  // console.log(`cellW ${cellW}`)
-  // console.log(`cellH ${cellH}`)
-  
-  // console.log(`drawAreaWidthInCells ${drawAreaWidthInCells}`)
-  // console.log(`drawAreaHeightInCells ${drawAreaHeightInCells}`)
+  const drawAreaWidthInCells = Math.floor((this.scale.width - MARGINS.left - MARGINS.right) / this.registry.get("cellW"));
+  const drawAreaHeightInCells = Math.floor((this.scale.height - MARGINS.top - MARGINS.bottom) / this.registry.get("cellH"));
 
   const topLine = TOP_LEFT
     + DASH.repeat(Math.floor((drawAreaWidthInCells - borderTitle.length) / 2) - 3)
@@ -67,5 +40,10 @@ export function borderText(cellW, cellH, borderTitle) {
     }
   });
 
-  return lines.join("\n");
+  this.add.text(
+    MARGINS.left,
+    MARGINS.top,
+    lines.join("\n"),
+    TEXT_STYLE,
+  );
 };

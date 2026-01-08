@@ -21,3 +21,9 @@ export const COLORS = {
   BG: "#000000",
   TEXT: "#00ff00",
 };
+
+export const TEXT_STYLE = {
+  fontFamily: 'monospace',
+  fontSize: FONT_SIZE,
+  color: COLORS.TEXT,
+};
