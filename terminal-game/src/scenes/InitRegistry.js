@@ -11,7 +11,7 @@ export default class InitRegistry extends Phaser.Scene {
     super("InitRegistry");
   }
 
-  create() {
+  init() {
 
     // cellW
     // cellH
@@ -44,5 +44,10 @@ export default class InitRegistry extends Phaser.Scene {
     this.registry.set("drawAreaHeightInCells", drawAreaHeightInCells);
     this.registry.set("drawInnerAreaWidthInCells", drawInnerAreaWidthInCells);
     this.registry.set("drawInnerAreaHeightInCells", drawInnerAreaHeightInCells);
+  }
+  
+  create() {
+    this.registry.set("init", this.init);
+    this.init();
   }
 };

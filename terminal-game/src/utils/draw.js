@@ -35,5 +35,5 @@ export function drawBorderBox(borderTitle) {
     }
   });
 
-  this.add.text(MARGINS.left, MARGINS.top, lines.join("\n"), TEXT_STYLE);
+  this.ui.add(this.add.text(MARGINS.left, MARGINS.top, lines.join("\n"), TEXT_STYLE));
 };
