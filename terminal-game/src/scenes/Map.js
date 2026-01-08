@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 
-import { drawBorderBox } from "../utils/draw";
+import { drawBorderBox, drawBuffer } from "../utils/draw";
 import { MARGINS, TEXT_STYLE } from "../config/constants";
 
 function putStr(buf, x, y, str) {
@@ -26,18 +26,16 @@ export default class Map extends Phaser.Scene {
 
     drawBorderBox.bind(this)("PUMP ROOM");
 
-    this.buffer = Array.from(
-      {length: this.registry.get("drawInnerAreaHeightInCells")},
-      () => Array(this.registry.get("drawInnerAreaWidthInCells")).fill("5")
-    );
-    this.ui.add(
-      this.add.text(
-        MARGINS.left + this.registry.get("cellW"),
-        MARGINS.top + this.registry.get("cellH"),
-        this.buffer.map(line => line.join("")).join("\n"),
-        TEXT_STYLE
-      )
-    );
+    const bufferHeightInCells = this.registry.get("drawInnerAreaHeightInCells");
+    const bufferWidthInCells = this.registry.get("drawInnerAreaWidthInCells");
+    if (bufferHeightInCells > 0 && bufferWidthInCells > 0) {
+      this.buffer = Array.from(
+        {length: bufferHeightInCells},
+        () => Array(bufferWidthInCells).fill("5")
+      );
+    }
+
+    drawBuffer.bind(this)();
 
   }
   
