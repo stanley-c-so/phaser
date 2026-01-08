@@ -9,6 +9,8 @@ const TOP_LEFT = "┌";
 const TOP_RIGHT = "┐";
 const BOTTOM_LEFT = "└";
 const BOTTOM_RIGHT = "┘";
+const BRACKET_LEFT = "[";
+const BRACKET_RIGHT = "]";
 
 export function initStyle() {
   const textStyle = {
@@ -44,21 +46,26 @@ export function borderText(cellW, cellH, borderTitle) {
   // console.log(`drawAreaHeightInCells ${drawAreaHeightInCells}`)
 
   const topLine = TOP_LEFT
-    + DASH.repeat(Math.floor((drawAreaWidthInCells - borderTitle.length) / 2) - 1)
+    + DASH.repeat(Math.floor((drawAreaWidthInCells - borderTitle.length) / 2) - 3)
+    + BRACKET_LEFT + " "
     + borderTitle
-    + DASH.repeat(Math.ceil((drawAreaWidthInCells - borderTitle.length) / 2) - 1)
+    + " " + BRACKET_RIGHT
+    + DASH.repeat(Math.ceil((drawAreaWidthInCells - borderTitle.length) / 2) - 3)
     + TOP_RIGHT;
   
   const bottomLine = BOTTOM_LEFT
     + DASH.repeat(drawAreaWidthInCells - 2)
     + BOTTOM_RIGHT;
 
-  const lines = [];
-  lines.push(topLine);
-  for (let i = 0; i < drawAreaHeightInCells - 2; ++i) {
-    lines.push("|" + " ".repeat(drawAreaWidthInCells - 2) + "|");
-  }
-  lines.push(bottomLine);
+  const lines = Array.from({length: drawAreaHeightInCells}, (_, i) => {
+    if (i === 0) {
+      return topLine;
+    } else if (i < drawAreaHeightInCells - 1) {
+      return "|" + " ".repeat(drawAreaWidthInCells - 2) + "|";
+    } else {
+      return bottomLine;
+    }
+  });
 
   return lines.join("\n");
 };
