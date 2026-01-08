@@ -20,7 +20,7 @@ export default class Map extends Phaser.Scene {
     super("Map");
   }
 
-  redraw() {
+  render() {
     this.ui?.removeAll(true);
     this.ui = this.add.container(0, 0);
 
@@ -31,7 +31,7 @@ export default class Map extends Phaser.Scene {
     if (bufferHeightInCells > 0 && bufferWidthInCells > 0) {
       this.buffer = Array.from(
         {length: bufferHeightInCells},
-        () => Array(bufferWidthInCells).fill("5")
+        () => Array(bufferWidthInCells).fill("")
       );
       drawBuffer.bind(this)();
     }
@@ -44,7 +44,7 @@ export default class Map extends Phaser.Scene {
     this.scale.on("resize", () => {
       // console.log("RESIZE");
       this.registry.get("init").bind(this)();
-      this.redraw();
+      this.render();
     });
   }
 };

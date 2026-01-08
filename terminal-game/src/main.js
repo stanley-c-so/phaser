@@ -53,5 +53,5 @@ window.addEventListener("keydown", (e) => {
   // window.location.href = "about:blank"
 }, { capture: true });
 
-game.scene.start("Map");
-// game.scene.start("SceneB");
+// game.scene.start("Map");
+game.scene.start("SceneB");

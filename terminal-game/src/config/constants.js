@@ -12,9 +12,6 @@ export const MARGINS = {
   // right: 0,
 };
 
-export const TERMINAL_COLS = 60;
-export const TERMINAL_ROWS = 20;
-
 export const FONT_SIZE = "20px";
 
 export const COLORS = {
