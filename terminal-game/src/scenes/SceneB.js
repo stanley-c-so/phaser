@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 
 import {
-  MARGINS,
+  MARGINS_IN_PX,
   COLORS,
   TEXT_STYLE,
 } from "../config/constants";
@@ -17,7 +17,7 @@ export default class SceneB extends Phaser.Scene {
     this.ui = this.add.container(0, 0);
 
     this.ui.add(
-      this.add.text(MARGINS.left, MARGINS.top, "SCENE B / TERMINAL (type; ENTER=nl, BACKSPACE=del)", {
+      this.add.text(MARGINS_IN_PX.left, MARGINS_IN_PX.top, "SCENE B / TERMINAL (type; ENTER=nl, BACKSPACE=del)", {
         fontFamily: "monospace",
         fontSize: "16px",
         color: COLORS.TEXT,
@@ -40,8 +40,8 @@ export default class SceneB extends Phaser.Scene {
   create() {
 
     // --- "terminal" config ---
-    this.originX = MARGINS.left;
-    this.originY = MARGINS.top + this.registry.get("cellH");
+    this.originX = MARGINS_IN_PX.left;
+    this.originY = MARGINS_IN_PX.top + this.registry.get("cellH");
     
     this.cursorCol = 0;
     this.cursorRow = 0;
@@ -51,7 +51,7 @@ export default class SceneB extends Phaser.Scene {
 
     this.scale.on("resize", () => {
       // console.log("RESIZE");
-      this.registry.get("init").bind(this)();
+      this.registry.get("resize").bind(this)();
       this.render();
     });
 

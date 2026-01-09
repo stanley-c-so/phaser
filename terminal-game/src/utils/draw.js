@@ -1,5 +1,5 @@
 import {
-  MARGINS,
+  MARGINS_IN_PX,
   TEXT_STYLE,
 } from "../config/constants";
 
@@ -22,7 +22,7 @@ export function drawBorderBox(borderTitle) {
   const topLine = TOP_LEFT
     + DASH.repeat(topLeftDashCount)
     + BRACKET_LEFT + " "
-    + borderTitle
+    + borderTitle.toUpperCase()
     + " " + BRACKET_RIGHT
     + DASH.repeat(topRightDashCount)
     + TOP_RIGHT;
@@ -41,14 +41,14 @@ export function drawBorderBox(borderTitle) {
     }
   });
 
-  this.ui.add(this.add.text(MARGINS.left, MARGINS.top, lines.join("\n"), TEXT_STYLE));
+  this.ui.add(this.add.text(MARGINS_IN_PX.left, MARGINS_IN_PX.top, lines.join("\n"), TEXT_STYLE));
 };
 
 export function drawBuffer() {
   this.ui.add(
     this.add.text(
-      MARGINS.left + this.registry.get("cellW"),
-      MARGINS.top + this.registry.get("cellH"),
+      MARGINS_IN_PX.left + this.registry.get("cellW"),
+      MARGINS_IN_PX.top + this.registry.get("cellH"),
       this.buffer.map(line => line.join("")).join("\n"),
       TEXT_STYLE
     )

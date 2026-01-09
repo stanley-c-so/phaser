@@ -13,19 +13,24 @@ function putStr(buf, x, y, str) {
   }
 }
 
-function drawColumnHeaders(headers) {
-  console.log("drawInnerAreaWidthInCells", this.registry.get("drawInnerAreaWidthInCells"))
+function bufferColumnHeaders(headers) {
+  const columnWidth = Math.floor(this.registry.get("drawInnerAreaWidthInCells") / headers.length);
   for (let i = 0; i < headers.length; ++i) {
-    console.log(i, Math.floor((i / headers.length) * this.registry.get("drawInnerAreaWidthInCells")))
+    if (headers[i].length > columnWidth) {
+      this.buffer = [];
+      return;
+    }
+  }
+  for (let i = 0; i < headers.length; ++i) {
+    const offset = Math.floor((columnWidth - headers[i].length) / 2);
     putStr(
       this.buffer,
-      Math.floor((i / headers.length) * this.registry.get("drawInnerAreaWidthInCells")),
+      i * columnWidth + offset,
       1,
-      headers[i],
+      headers[i].toUpperCase(),
     );
   }
 }
-
 
 export default class Map extends Phaser.Scene {
   constructor() {
@@ -36,9 +41,18 @@ export default class Map extends Phaser.Scene {
 
     this.scale.on("resize", () => {
       // console.log("RESIZE");
-      this.registry.get("init").bind(this)();
+      this.registry.get("resize").bind(this)();
 
       // recalculate buffer state
+      const bufferHeightInCells = this.registry.get("drawInnerAreaHeightInCells");
+      const bufferWidthInCells = this.registry.get("drawInnerAreaWidthInCells");
+      if (bufferHeightInCells > 0 && bufferWidthInCells > 0) {
+        this.buffer = Array.from(
+          {length: bufferHeightInCells},
+          () => Array(bufferWidthInCells).fill(" ")
+        );
+        bufferColumnHeaders.bind(this)(["test_1", "test_2", "test_3"]);
+      }
 
       this.render();
     });
@@ -48,20 +62,8 @@ export default class Map extends Phaser.Scene {
     this.ui?.removeAll(true);
     this.ui = this.add.container(0, 0);
 
-    drawBorderBox.bind(this)("PUMP ROOM");
-
-    const bufferHeightInCells = this.registry.get("drawInnerAreaHeightInCells");
-    const bufferWidthInCells = this.registry.get("drawInnerAreaWidthInCells");
-    if (bufferHeightInCells > 0 && bufferWidthInCells > 0) {
-      this.buffer = Array.from(
-        {length: bufferHeightInCells},
-        () => Array(bufferWidthInCells).fill(" ")
-      );
-      drawColumnHeaders.bind(this)(["TEST1", "TEST2", "TEST3"]);
-      drawBuffer.bind(this)();
-    }
-
-
+    drawBorderBox.bind(this)("pump room");
+    drawBuffer.bind(this)();
   }
   
 };

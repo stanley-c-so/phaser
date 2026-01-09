@@ -1,7 +1,4 @@
-// export const GAME_WIDTH = 1024;
-// export const GAME_HEIGHT = 768;
-
-export const MARGINS = {
+export const MARGINS_IN_PX = {
   top: 80,
   bottom: 80,
   left: 200,

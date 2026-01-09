@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 
-import { MARGINS, COLORS } from "../config/constants";
+import { MARGINS_IN_PX, COLORS } from "../config/constants";
 
 export default class SceneA extends Phaser.Scene {
   constructor() {
@@ -8,7 +8,7 @@ export default class SceneA extends Phaser.Scene {
   }
 
   create() {
-    this.add.text(MARGINS.left, MARGINS.top, "SCENE A\n(press SPACE)", {
+    this.add.text(MARGINS_IN_PX.left, MARGINS_IN_PX.top, "SCENE A\n(press SPACE)", {
       fontFamily: "monospace",
       fontSize: "20px",
       color: COLORS.TEXT,
