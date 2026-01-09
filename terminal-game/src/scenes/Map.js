@@ -1,7 +1,6 @@
 import Phaser from "phaser";
 
 import { drawBorderBox, drawBuffer } from "../utils/draw";
-import { MARGINS, TEXT_STYLE } from "../config/constants";
 
 function putStr(buf, x, y, str) {
   const ROW_LIMIT = buf.length;
@@ -14,10 +13,35 @@ function putStr(buf, x, y, str) {
   }
 }
 
+function drawColumnHeaders(headers) {
+  console.log("drawInnerAreaWidthInCells", this.registry.get("drawInnerAreaWidthInCells"))
+  for (let i = 0; i < headers.length; ++i) {
+    console.log(i, Math.floor((i / headers.length) * this.registry.get("drawInnerAreaWidthInCells")))
+    putStr(
+      this.buffer,
+      Math.floor((i / headers.length) * this.registry.get("drawInnerAreaWidthInCells")),
+      1,
+      headers[i],
+    );
+  }
+}
+
 
 export default class Map extends Phaser.Scene {
   constructor() {
     super("Map");
+  }
+
+  create() {
+
+    this.scale.on("resize", () => {
+      // console.log("RESIZE");
+      this.registry.get("init").bind(this)();
+
+      // recalculate buffer state
+
+      this.render();
+    });
   }
 
   render() {
@@ -31,20 +55,13 @@ export default class Map extends Phaser.Scene {
     if (bufferHeightInCells > 0 && bufferWidthInCells > 0) {
       this.buffer = Array.from(
         {length: bufferHeightInCells},
-        () => Array(bufferWidthInCells).fill("")
+        () => Array(bufferWidthInCells).fill(" ")
       );
+      drawColumnHeaders.bind(this)(["TEST1", "TEST2", "TEST3"]);
       drawBuffer.bind(this)();
     }
 
 
   }
   
-  create() {
-
-    this.scale.on("resize", () => {
-      // console.log("RESIZE");
-      this.registry.get("init").bind(this)();
-      this.render();
-    });
-  }
 };
