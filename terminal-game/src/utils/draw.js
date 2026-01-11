@@ -4,6 +4,7 @@ import {
 } from "../config/constants";
 
 const DASH = "─";
+const PIPE = "|";
 const TOP_LEFT = "┌";
 const TOP_RIGHT = "┐";
 const BOTTOM_LEFT = "└";
@@ -35,7 +36,7 @@ export function drawBorderBox(borderTitle) {
     if (i === 0) {
       return topLine;
     } else if (i < this.registry.get("drawAreaHeightInCells") - 1) {
-      return "|" + " ".repeat(verticalLineCount) + "|";
+      return PIPE + " ".repeat(verticalLineCount) + PIPE;
     } else {
       return bottomLine;
     }
