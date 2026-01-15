@@ -4,13 +4,52 @@ import {
 } from "../config/constants";
 
 const DASH = "─";
-const PIPE = "|";
+const PIPE = "│";
 const TOP_LEFT = "┌";
 const TOP_RIGHT = "┐";
 const BOTTOM_LEFT = "└";
 const BOTTOM_RIGHT = "┘";
 const BRACKET_LEFT = "[";
 const BRACKET_RIGHT = "]";
+
+// T junctions
+const T_DOWN = "┬";        // ┬  (like an upside-down T)
+const T_UP = "┴";          // ┴  (like a T)
+const T_RIGHT = "├";       // ├  (T pointing right)
+const T_LEFT = "┤";        // ┤  (T pointing left)
+
+// Optional: full intersection
+const CROSS = "┼";         // ┼
+
+/*
+
+┌─────┐
+│█████│───────x  x─── A
+│█████│─────x
+│█████│───x
+│█████│─x        x─── B
+└─────┘
+┌─────┐
+│█████│───────x  x─── C
+│█████│─────x
+│█████│───x
+│█████│─x        x─── D
+└─────┘
+
+┌─────┐
+│█████│────────────── A
+│█████│──────────┐
+│█████│───┐      │
+│█████│   │      └─── B
+└─────┘   │
+┌─────┐   │
+│█████│───┴────────── C
+│█████│──────────┐
+│█████│          │
+│█████│          └─── D
+└─────┘
+
+*/
 
 export function drawBorderBox(borderTitle) {
 
