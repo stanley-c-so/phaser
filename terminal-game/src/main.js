@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 
 import { COLORS } from "./config/constants";
+import { validate_MAP_DATA } from "./data/map";
 import InitRegistry from "./scenes/InitRegistry";
 import SceneA from "./scenes/SceneA";
 import SceneB from "./scenes/SceneB";
@@ -53,5 +54,10 @@ window.addEventListener("keydown", (e) => {
   // window.location.href = "about:blank"
 }, { capture: true });
 
-game.scene.start("Map");
-// game.scene.start("SceneB");
+try {
+  validate_MAP_DATA();
+  game.scene.start("Map");
+  // game.scene.start("SceneB");
+} catch(e) {
+  console.error(e);
+}

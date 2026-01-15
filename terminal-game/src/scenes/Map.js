@@ -1,17 +1,12 @@
 import Phaser from "phaser";
 
-import { drawBorderBox, drawBuffer } from "../utils/draw";
+import { MAP_DATA } from "../data/map";
 
-function putStr(buf, x, y, str) {
-  const ROW_LIMIT = buf.length;
-  const COL_LIMIT = buf[0].length;
-  if (y < 0 || y >= ROW_LIMIT) return;
-  if (x + str.length - 1 >= COL_LIMIT) return;
-  for (let i = 0; i < str.length; ++i) {
-    const xx = x + i;
-    buf[y][xx] = str[i];
-  }
-}
+import {
+  drawBorderBox,
+  drawBuffer,
+  putStr,
+} from "../utils/draw";
 
 function bufferColumnHeaders(headers) {
   const columnWidth = Math.floor(this.registry.get("drawInnerAreaWidthInCells") / headers.length);
@@ -30,6 +25,10 @@ function bufferColumnHeaders(headers) {
       headers[i].toUpperCase(),
     );
   }
+}
+
+function drawMap() {
+
 }
 
 export default class Map extends Phaser.Scene {
@@ -51,7 +50,9 @@ export default class Map extends Phaser.Scene {
           {length: bufferHeightInCells},
           () => Array(bufferWidthInCells).fill(" ")
         );
-        bufferColumnHeaders.bind(this)(["test_1", "test_2", "test_3"]);
+        // bufferColumnHeaders.bind(this)(["test_1", "test_2", "test_3"]);
+
+        drawMap();
       }
 
       this.render();

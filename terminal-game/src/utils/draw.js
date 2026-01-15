@@ -86,3 +86,14 @@ export function drawBuffer() {
     )
   );
 }
+
+export function putStr(buffer, x, y, str) {
+  const ROW_LIMIT = buffer.length;
+  const COL_LIMIT = buffer[0].length;
+  if (y < 0 || y >= ROW_LIMIT) return;
+  if (x + str.length - 1 >= COL_LIMIT) return;
+  for (let i = 0; i < str.length; ++i) {
+    const xx = x + i;
+    buffer[y][xx] = str[i];
+  }
+}
