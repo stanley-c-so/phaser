@@ -1,5 +1,5 @@
 export const MAP_DATA = {
-  tanks: ['T1', 'T2'],
+  tanks: ['1', '2'],
 
   pumps: {
     // Tank 0
@@ -35,6 +35,20 @@ export function validate_MAP_DATA() {
   if (!pumpLabels.length) throw new Error('MAP DATA has no pumps.');
   if (pumpLabels.length > MAX_PUMPS) {
     throw new Error(`MAP DATA has ${pumpLabels.length} pumps. Max is ${MAX_PUMPS}.`);
+  }
+
+  // Enforce single character tank labels
+  for (const label of MAP_DATA.tanks) {
+    if (label.length > 1) {
+      throw new Error(`Invalid tank label ${label}. Must be 1 character only.`);
+    }
+  }
+  
+  // Enforce single character pump labels
+  for (const label of pumpLabels) {
+    if (label.length > 1) {
+      throw new Error(`Invalid pump label ${label}. Must be 1 character only.`);
+    }
   }
 
   // Validate connections + classify pump types in the *provided order*
