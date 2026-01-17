@@ -26,20 +26,36 @@ const CROSS = "┼";         // ┼
 15 rows, (16 + w) cols where w is width of tank
 
               x───────A
-┌─────┐
+┌──1──┐
 │█████│───────x x─────B
 │█████│─────x
 │█████│───x       x───C
 │█████│─x
 └─────┘             x─D
         x─────x
-┌─────┐             x─E
+┌──2──┐             x─E
 │█████│─x
 │█████│───x       x───F
 │█████│─────x
 │█████│───────x x─────G
 └─────┘
               x───────H
+
+1                     1
+                       
+                       
+                       
+                       
+                       
+                       
+                       
+                       
+                       
+                       
+                       
+                       
+                       
+1                     1
 
 */
 
@@ -76,12 +92,25 @@ export function drawBorderBox(borderTitle) {
   this.ui.add(this.add.text(MARGINS_IN_PX.left, MARGINS_IN_PX.top, lines.join("\n"), TEXT_STYLE));
 };
 
+export function remakeBuffer() {
+  const bufferHeightInCells = this.registry.get("drawInnerAreaHeightInCells");
+  const bufferWidthInCells = this.registry.get("drawInnerAreaWidthInCells");
+  if (bufferHeightInCells <= 0 || bufferWidthInCells <= 0) {
+    return false;
+  }
+  this.buffer = Array.from(
+    {length: bufferHeightInCells},
+    () => Array(bufferWidthInCells).fill(" ")
+  );
+  return true;
+}
+
 export function drawBuffer() {
   this.ui.add(
     this.add.text(
       MARGINS_IN_PX.left + this.registry.get("cellW"),
       MARGINS_IN_PX.top + this.registry.get("cellH"),
-      this.buffer.map(line => line.join("")).join("\n"),
+      this.buffer ? this.buffer.map(line => line.join("")).join("\n") : "",
       TEXT_STYLE
     )
   );
