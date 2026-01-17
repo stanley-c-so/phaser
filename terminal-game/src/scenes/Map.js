@@ -3,19 +3,29 @@ import Phaser from "phaser";
 import { MAP_DATA } from "../data/map";
 
 import {
+  roundUpToOdd,
+  clamp,
+} from "../utils/pure";
+
+import {
   drawBorderBox,
+  remakeBuffer,
   drawBuffer,
   putStr,
 } from "../utils/draw";
 
 function bufferColumnHeaders(headers) {
   const columnWidth = Math.floor(this.registry.get("drawInnerAreaWidthInCells") / headers.length);
+
+  // No-draw if any header exceeds columnWidth
   for (let i = 0; i < headers.length; ++i) {
     if (headers[i].length > columnWidth) {
       this.buffer = [];
       return;
     }
   }
+
+  // Draw the headers
   for (let i = 0; i < headers.length; ++i) {
     const offset = Math.floor((columnWidth - headers[i].length) / 2);
     putStr(
@@ -27,8 +37,88 @@ function bufferColumnHeaders(headers) {
   }
 }
 
-function drawMap() {
+function drawAtScale(canvas, x_at_scale_1, y_at_scale_1, c, SCALE) {
+  const anchorX = x_at_scale_1 * SCALE;
+  const anchorY = y_at_scale_1 * SCALE;
+  for (let dy = 0; dy < SCALE; ++dy) {
+    for (let dx = 0; dx < SCALE; ++dx) {
+      canvas[anchorY + dy][anchorX + dx] = c;
+    }
+  }
+}
 
+function drawMap(x_start_pct = 0, x_end_pct = 100, y_start_pct = 0, y_end_pct = 100) {
+  const drawInnerAreaWidthInCells = this.registry.get("drawInnerAreaWidthInCells");
+  const drawInnerAreaHeightInCells = this.registry.get("drawInnerAreaHeightInCells");
+  
+  const maxCanvasWidthInCells = Math.floor(drawInnerAreaWidthInCells * (x_end_pct - x_start_pct) / 100);
+  const maxCanvasHeightInCells = Math.floor(drawInnerAreaHeightInCells * (y_end_pct - y_start_pct) / 100);
+  
+  const pumpLabels = Object.keys(MAP_DATA.pumps);
+  const numPumps = pumpLabels.length;
+
+  const MIN_TANK_WIDTH = 7;     // arbitrary
+  const MIN_TANK_HEIGHT = 6;    // tank top and bottom, plus 4 layers of liquid
+  const MIN_WIDTH_PIPES = 16;   // staggered pipe connections
+  
+  const minWidthOfImage = MIN_WIDTH_PIPES + MIN_TANK_WIDTH;
+  const minHeightOfImage = roundUpToOdd(                      // this must be odd
+                            Math.max(MIN_TANK_HEIGHT * 2 + 1,  // if the tanks take up more vertical space
+                                    numPumps * 2 - 1)         // if the pumps take up more vertical space
+                            );
+  
+  if (
+    maxCanvasWidthInCells < minWidthOfImage
+    || maxCanvasHeightInCells < minHeightOfImage
+  ) return;
+
+  // console.log("minWidthOfImage", minWidthOfImage)
+  // console.log("minHeightOfImage", minHeightOfImage)
+  const SCALE = Math.min(
+    Math.floor(maxCanvasWidthInCells / minWidthOfImage),
+    Math.floor(maxCanvasHeightInCells / minHeightOfImage),
+  );
+  console.log(`SCALE: ${SCALE}`);
+
+  const canvasWidthInCells = SCALE * minWidthOfImage;
+  const canvasHeightInCells = SCALE * minHeightOfImage;
+
+  const templateBuffer = Array.from({length: canvasHeightInCells}, () => Array(canvasWidthInCells).fill(" "));
+
+  // draw corner markers
+  templateBuffer[0][0] = SCALE;
+  templateBuffer[0][canvasWidthInCells - 1] = SCALE;
+  templateBuffer[canvasHeightInCells - 1][0] = SCALE;
+  templateBuffer[canvasHeightInCells - 1][canvasWidthInCells - 1] = SCALE;
+
+  // draw pumps
+  for (let i = 0; i < numPumps; ++i) {
+    const pumpLabel = pumpLabels[i];
+    drawAtScale(templateBuffer, minWidthOfImage - 1, i * 2, pumpLabel, SCALE);
+  }
+  
+  // console.log("DRAW MAP")
+  // console.log(canvasWidthInCells)
+  // console.log(canvasHeightInCells)
+
+  // draw maxCanvas corners
+  const maxCanvasL = clamp(Math.floor(drawInnerAreaWidthInCells * x_start_pct / 100), 0, drawInnerAreaWidthInCells - 1);
+  const maxCanvasR = clamp(Math.floor(drawInnerAreaWidthInCells * x_end_pct / 100), 0, drawInnerAreaWidthInCells - 1);
+  const maxCanvasU = clamp(Math.floor(drawInnerAreaHeightInCells * y_start_pct / 100), 0, drawInnerAreaHeightInCells - 1);
+  const maxCanvasD = clamp(Math.floor(drawInnerAreaHeightInCells * y_end_pct / 100), 0, drawInnerAreaHeightInCells - 1);
+  this.buffer[maxCanvasU][maxCanvasL] = "X";
+  this.buffer[maxCanvasU][maxCanvasR] = "X";
+  this.buffer[maxCanvasD][maxCanvasL] = "X";
+  this.buffer[maxCanvasD][maxCanvasR] = "X";
+
+  const bufferTranslationOffsetX = Math.floor(drawInnerAreaWidthInCells * x_start_pct / 100 + (maxCanvasWidthInCells - canvasWidthInCells) / 2);
+  const bufferTranslationOffsetY = Math.floor(drawInnerAreaHeightInCells * y_start_pct / 100 + (maxCanvasHeightInCells - canvasHeightInCells) / 2);
+  for (let row = 0; row < canvasHeightInCells; ++row) {
+    for (let col = 0; col < canvasWidthInCells; ++col) {
+      this.buffer[clamp(row + bufferTranslationOffsetY, 0, drawInnerAreaHeightInCells - 1)][clamp(col + bufferTranslationOffsetX, 0, drawInnerAreaWidthInCells - 1)] = templateBuffer[row][col];
+    }
+  }
+  console.log(templateBuffer.map(line => line.join("")).join("\n"))
 }
 
 export default class Map extends Phaser.Scene {
@@ -43,16 +133,9 @@ export default class Map extends Phaser.Scene {
       this.registry.get("resize").bind(this)();
 
       // recalculate buffer state
-      const bufferHeightInCells = this.registry.get("drawInnerAreaHeightInCells");
-      const bufferWidthInCells = this.registry.get("drawInnerAreaWidthInCells");
-      if (bufferHeightInCells > 0 && bufferWidthInCells > 0) {
-        this.buffer = Array.from(
-          {length: bufferHeightInCells},
-          () => Array(bufferWidthInCells).fill(" ")
-        );
-        // bufferColumnHeaders.bind(this)(["test_1", "test_2", "test_3"]);
-
-        drawMap();
+      if (remakeBuffer.bind(this)()) {
+        // drawMap.bind(this)();
+        drawMap.bind(this)(5, 75, 5, 100);
       }
 
       this.render();
