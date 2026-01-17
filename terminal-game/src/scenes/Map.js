@@ -85,11 +85,13 @@ function drawMap(x_start_pct = 0, x_end_pct = 100, y_start_pct = 0, y_end_pct = 
 
   const templateBuffer = Array.from({length: canvasHeightInCells}, () => Array(canvasWidthInCells).fill(" "));
 
-  // draw corner markers
-  templateBuffer[0][0] = SCALE;
-  templateBuffer[0][canvasWidthInCells - 1] = SCALE;
-  templateBuffer[canvasHeightInCells - 1][0] = SCALE;
-  templateBuffer[canvasHeightInCells - 1][canvasWidthInCells - 1] = SCALE;
+  // // draw corner markers
+  // templateBuffer[0][0] = SCALE;
+  // templateBuffer[0][canvasWidthInCells - 1] = SCALE;
+  // templateBuffer[canvasHeightInCells - 1][0] = SCALE;
+  // templateBuffer[canvasHeightInCells - 1][canvasWidthInCells - 1] = SCALE;
+
+  const middleRow = Math.floor(minHeightOfImage / 2);
 
   // draw pumps
   for (let i = 0; i < numPumps; ++i) {
@@ -97,19 +99,53 @@ function drawMap(x_start_pct = 0, x_end_pct = 100, y_start_pct = 0, y_end_pct = 
     drawAtScale(templateBuffer, minWidthOfImage - 1, i * 2, pumpLabel, SCALE);
   }
   
-  // console.log("DRAW MAP")
-  // console.log(canvasWidthInCells)
-  // console.log(canvasHeightInCells)
+  // draw top tank
+  drawAtScale(templateBuffer, 0, middleRow - MIN_TANK_HEIGHT, "┌", SCALE);
+  drawAtScale(templateBuffer, MIN_TANK_WIDTH - 1, middleRow - MIN_TANK_HEIGHT, "┐", SCALE);
+  drawAtScale(templateBuffer, 0, middleRow - 1, "└", SCALE);
+  drawAtScale(templateBuffer, MIN_TANK_WIDTH - 1, middleRow - 1, "┘", SCALE);
+  for (let i = 0; i < MIN_TANK_HEIGHT - 2; ++i) {
+    drawAtScale(templateBuffer, 0, middleRow - MIN_TANK_HEIGHT + 1 + i, "│", SCALE);
+  }
+  for (let i = 0; i < MIN_TANK_HEIGHT - 2; ++i) {
+    drawAtScale(templateBuffer, MIN_TANK_WIDTH - 1, middleRow - MIN_TANK_HEIGHT + 1 + i, "│", SCALE);
+  }
+  for (let i = 0; i < MIN_TANK_WIDTH - 2; ++i) {
+    drawAtScale(templateBuffer, 1 + i, middleRow - MIN_TANK_HEIGHT, "─", SCALE);
+  }
+  for (let i = 0; i < MIN_TANK_WIDTH - 2; ++i) {
+    drawAtScale(templateBuffer, 1 + i, middleRow - 1, "─", SCALE);
+  }
+  drawAtScale(templateBuffer, Math.floor((MIN_TANK_WIDTH - 2) / 2) + 1, middleRow - MIN_TANK_HEIGHT, MAP_DATA.tanks[0], SCALE);
 
-  // draw maxCanvas corners
-  const maxCanvasL = clamp(Math.floor(drawInnerAreaWidthInCells * x_start_pct / 100), 0, drawInnerAreaWidthInCells - 1);
-  const maxCanvasR = clamp(Math.floor(drawInnerAreaWidthInCells * x_end_pct / 100), 0, drawInnerAreaWidthInCells - 1);
-  const maxCanvasU = clamp(Math.floor(drawInnerAreaHeightInCells * y_start_pct / 100), 0, drawInnerAreaHeightInCells - 1);
-  const maxCanvasD = clamp(Math.floor(drawInnerAreaHeightInCells * y_end_pct / 100), 0, drawInnerAreaHeightInCells - 1);
-  this.buffer[maxCanvasU][maxCanvasL] = "X";
-  this.buffer[maxCanvasU][maxCanvasR] = "X";
-  this.buffer[maxCanvasD][maxCanvasL] = "X";
-  this.buffer[maxCanvasD][maxCanvasR] = "X";
+  // draw bottom tank
+  drawAtScale(templateBuffer, 0, middleRow + 1, "┌", SCALE);
+  drawAtScale(templateBuffer, MIN_TANK_WIDTH - 1, middleRow + 1, "┐", SCALE);
+  drawAtScale(templateBuffer, 0, middleRow + MIN_TANK_HEIGHT, "└", SCALE);
+  drawAtScale(templateBuffer, MIN_TANK_WIDTH - 1, middleRow + MIN_TANK_HEIGHT, "┘", SCALE);
+  for (let i = 0; i < MIN_TANK_HEIGHT - 2; ++i) {
+    drawAtScale(templateBuffer, 0, middleRow + 2 + i, "│", SCALE);
+  }
+  for (let i = 0; i < MIN_TANK_HEIGHT - 2; ++i) {
+    drawAtScale(templateBuffer, MIN_TANK_WIDTH - 1, middleRow + 2 + i, "│", SCALE);
+  }
+  for (let i = 0; i < MIN_TANK_WIDTH - 2; ++i) {
+    drawAtScale(templateBuffer, 1 + i, middleRow + 1, "─", SCALE);
+  }
+  for (let i = 0; i < MIN_TANK_WIDTH - 2; ++i) {
+    drawAtScale(templateBuffer, 1 + i, middleRow + MIN_TANK_HEIGHT, "─", SCALE);
+  }
+  drawAtScale(templateBuffer, Math.floor((MIN_TANK_WIDTH - 2) / 2) + 1, middleRow + 1, MAP_DATA.tanks[1], SCALE);
+  
+  // // draw maxCanvas corner markers
+  // const maxCanvasL = clamp(Math.floor(drawInnerAreaWidthInCells * x_start_pct / 100), 0, drawInnerAreaWidthInCells - 1);
+  // const maxCanvasR = clamp(Math.floor(drawInnerAreaWidthInCells * x_end_pct / 100), 0, drawInnerAreaWidthInCells - 1);
+  // const maxCanvasU = clamp(Math.floor(drawInnerAreaHeightInCells * y_start_pct / 100), 0, drawInnerAreaHeightInCells - 1);
+  // const maxCanvasD = clamp(Math.floor(drawInnerAreaHeightInCells * y_end_pct / 100), 0, drawInnerAreaHeightInCells - 1);
+  // this.buffer[maxCanvasU][maxCanvasL] = "X";
+  // this.buffer[maxCanvasU][maxCanvasR] = "X";
+  // this.buffer[maxCanvasD][maxCanvasL] = "X";
+  // this.buffer[maxCanvasD][maxCanvasR] = "X";
 
   const bufferTranslationOffsetX = Math.floor(drawInnerAreaWidthInCells * x_start_pct / 100 + (maxCanvasWidthInCells - canvasWidthInCells) / 2);
   const bufferTranslationOffsetY = Math.floor(drawInnerAreaHeightInCells * y_start_pct / 100 + (maxCanvasHeightInCells - canvasHeightInCells) / 2);
@@ -118,6 +154,8 @@ function drawMap(x_start_pct = 0, x_end_pct = 100, y_start_pct = 0, y_end_pct = 
       this.buffer[clamp(row + bufferTranslationOffsetY, 0, drawInnerAreaHeightInCells - 1)][clamp(col + bufferTranslationOffsetX, 0, drawInnerAreaWidthInCells - 1)] = templateBuffer[row][col];
     }
   }
+
+  // diagnostic
   console.log(templateBuffer.map(line => line.join("")).join("\n"))
 }
 
@@ -134,8 +172,8 @@ export default class Map extends Phaser.Scene {
 
       // recalculate buffer state
       if (remakeBuffer.bind(this)()) {
-        // drawMap.bind(this)();
-        drawMap.bind(this)(5, 75, 5, 100);
+        drawMap.bind(this)();
+        // drawMap.bind(this)(5, 75, 5, 100);
       }
 
       this.render();
