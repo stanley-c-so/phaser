@@ -10,6 +10,7 @@ export const MARGINS_IN_PX = {
 };
 
 export const FONT_SIZE = "20px";
+// export const FONT_SIZE = "15px";
 
 export const COLORS = {
   BG: "#000000",
