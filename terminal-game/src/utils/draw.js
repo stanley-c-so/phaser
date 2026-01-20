@@ -3,20 +3,20 @@ import {
   TEXT_STYLE,
 } from "../config/constants";
 
-const DASH = "─";
-const PIPE = "│";
-const TOP_LEFT = "┌";
-const TOP_RIGHT = "┐";
-const BOTTOM_LEFT = "└";
-const BOTTOM_RIGHT = "┘";
-const BRACKET_LEFT = "[";
-const BRACKET_RIGHT = "]";
+export const DASH = "─";
+export const PIPE = "│";
+export const TOP_LEFT = "┌";
+export const TOP_RIGHT = "┐";
+export const BOTTOM_LEFT = "└";
+export const BOTTOM_RIGHT = "┘";
+export const BRACKET_LEFT = "[";
+export const BRACKET_RIGHT = "]";
 
 // T junctions
-const T_DOWN = "┬";        // ┬  (like an upside-down T)
-const T_UP = "┴";          // ┴  (like a T)
-const T_RIGHT = "├";       // ├  (T pointing right)
-const T_LEFT = "┤";        // ┤  (T pointing left)
+export const T_DOWN = "┬";        // ┬  (like an upside-down T)
+export const T_UP = "┴";          // ┴  (like a T)
+export const T_RIGHT = "├";       // ├  (T pointing right)
+export const T_LEFT = "┤";        // ┤  (T pointing left)
 
 // Optional: full intersection
 const CROSS = "┼";         // ┼

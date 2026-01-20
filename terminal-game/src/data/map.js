@@ -1,21 +1,21 @@
 export const MAP_DATA = {
   tanks: ['1', '2'],
 
-  // pumps: {
-  //   // Tank 0
-  //   A: [0],
-  //   B: [0],
-  //   C: [0],
+  pumps: {
+    // Tank 0
+    A: [0],
+    B: [0],
+    C: [0],
     
-  //   // Both tanks
-  //   D: [0, 1],
-  //   E: [0, 1],
+    // Both tanks
+    D: [0, 1],
+    E: [0, 1],
     
-  //   // Tank 1
-  //   F: [1],
-  //   G: [1],
-  //   H: [1],
-  // },
+    // Tank 1
+    F: [1],
+    G: [1],
+    H: [1],
+  },
 
   // pumps: {
   //   // Tank 0
@@ -29,14 +29,34 @@ export const MAP_DATA = {
   //   h: [1],
   // },
 
-  pumps: {
-    // Both tanks
-    A: [0, 1],
+  // pumps: {
+  //   // Both tanks
+  //   A: [0, 1],
     
-    // Tank 1
-    y: [1],
-    z: [1],
-  },
+  //   // Tank 1
+  //   y: [1],
+  //   z: [1],
+  // },
+
+  // pumps: {
+  //   // Both tanks
+  //   A: [0, 1],
+    
+  //   // Tank 1
+  //   x: [1],
+  //   y: [1],
+  //   z: [1],
+  // },
+
+  // pumps: {
+  //   // Tank 0
+  //   a: [0],
+  //   b: [0],
+  //   c: [0],
+    
+  //   // Both tanks
+  //   B: [0, 1],
+  // },
 };
 
 export function validate_MAP_DATA() {
