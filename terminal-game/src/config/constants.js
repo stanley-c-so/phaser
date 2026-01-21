@@ -9,8 +9,9 @@ export const MARGINS_IN_PX = {
   // right: 0,
 };
 
-export const FONT_SIZE = "20px";
+// export const FONT_SIZE = "20px";
 // export const FONT_SIZE = "15px";
+export const FONT_SIZE = "10px";
 
 export const COLORS = {
   BG: "#000000",
