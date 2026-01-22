@@ -69,6 +69,15 @@ export const MAP_DATA = {
     // Tank 1
     { label: "3", tanks: [1] },
   ],
+  utilities: [
+    { label: "Pool", pump: "4" },
+    { label: "Greenhouse", pump: "1" },
+    { label: "Aquarium", pump: "1" },
+    { label: "Reservoir", pump: "2" },
+    { label: "Fountain", pump: "2" },
+    { label: "Kitchen", pump: "3" },
+  ],
+
 };
 
 export function validate_MAP_DATA() {
@@ -164,5 +173,12 @@ export function validate_MAP_DATA() {
   }
   if (bottomOutlets > MAX_PUMPS_PER_TANK) {
     throw new Error(`Tank ${MAP_DATA.tanks[1]} uses ${bottomOutlets} outlets (max ${MAX_PUMPS_PER_TANK}).`);
+  }
+
+  // Enforce each utility is connected to a valid pump
+  for (const utility of MAP_DATA.utilities) {
+    if (!pumpLabels.includes(utility.pump)) {
+      throw new Error(`Utility ${utility.label} is connected to invalid pump ${utility.pump}.`);
+    }
   }
 }
