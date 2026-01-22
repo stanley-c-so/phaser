@@ -80,7 +80,7 @@ function drawMap(x_start_pct = 0, x_end_pct = 100, y_start_pct = 0, y_end_pct = 
   const maxCanvasWidthInCells = Math.floor(drawInnerAreaWidthInCells * (x_end_pct - x_start_pct) / 100);
   const maxCanvasHeightInCells = Math.floor(drawInnerAreaHeightInCells * (y_end_pct - y_start_pct) / 100);
   
-  const pumpLabels = Object.keys(MAP_DATA.pumps);
+  const pumpLabels = MAP_DATA.pumps.map(p => p.label);
   const numPumps = pumpLabels.length;
   const heightOfPumps = numPumps * 2 - 1;
 
@@ -170,11 +170,12 @@ function drawMap(x_start_pct = 0, x_end_pct = 100, y_start_pct = 0, y_end_pct = 
   const tank2OnlyPumps = [];
   const manifoldPumps = [];
   const pipeBendCoordsByPump = {};
-  for (const label of pumpLabels) {
-    if (MAP_DATA.pumps[label].length > 1) {
+  for (const pump of MAP_DATA.pumps) {
+    const label = pump.label;
+    if (pump.tanks.length > 1) {
       manifoldPumps.push(label);
     } else {
-      if (MAP_DATA.pumps[label][0] === 0) {
+      if (pump.tanks[0] === 0) {
         tank1OnlyPumps.push(label);
       } else {
         tank2OnlyPumps.push(label);

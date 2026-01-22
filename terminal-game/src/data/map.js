@@ -1,62 +1,74 @@
 export const MAP_DATA = {
   tanks: ['1', '2'],
 
-  pumps: {
+  // pumps: [
+  //   // Tank 0
+  //   { label: "A", tanks: [0] },
+  //   { label: "B", tanks: [0] },
+  //   { label: "C", tanks: [0] },
+    
+  //   // Both tanks
+  //   { label: "D", tanks: [0, 1] },
+  //   { label: "E", tanks: [0, 1] },
+    
+  //   // Tank 1
+  //   { label: "F", tanks: [1] },
+  //   { label: "G", tanks: [1] },
+  //   { label: "H", tanks: [1] },
+  // ],
+
+  // pumps: [
+  //   // Tank 0
+  //   { label: "a", tanks: [0] },
+    
+  //   // Both tanks
+  //   { label: "d", tanks: [0, 1] },
+    
+  //   // Tank 1
+  //   { label: "f", tanks: [1] },
+  //   { label: "h", tanks: [1] },
+  // ],
+
+  // pumps: [
+  //   // Both tanks
+  //   { label: "A", tanks: [0, 1] },
+    
+  //   // Tank 1
+  //   { label: "y", tanks: [1] },
+  //   { label: "z", tanks: [1] },
+  // ],
+
+  // pumps: [
+  //   // Both tanks
+  //   { label: "A", tanks: [0, 1] },
+    
+  //   // Tank 1
+  //   { label: "x", tanks: [1] },
+  //   { label: "y", tanks: [1] },
+  //   { label: "z", tanks: [1] },
+  // ],
+
+  // pumps: [
+  //   // Tank 0
+  //   { label: "a", tanks: [0] },
+  //   { label: "b", tanks: [0] },
+  //   { label: "c", tanks: [0] },
+    
+  //   // Both tanks
+  //   { label: "B", tanks: [0, 1] },
+  // ],
+
+  pumps: [
     // Tank 0
-    A: [0],
-    B: [0],
-    C: [0],
+    { label: "4", tanks: [0] },
+    { label: "1", tanks: [0] },
     
     // Both tanks
-    D: [0, 1],
-    E: [0, 1],
-    
+    { label: "2", tanks: [0, 1] },
+
     // Tank 1
-    F: [1],
-    G: [1],
-    H: [1],
-  },
-
-  // pumps: {
-  //   // Tank 0
-  //   a: [0],
-    
-  //   // Both tanks
-  //   d: [0, 1],
-    
-  //   // Tank 1
-  //   f: [1],
-  //   h: [1],
-  // },
-
-  // pumps: {
-  //   // Both tanks
-  //   A: [0, 1],
-    
-  //   // Tank 1
-  //   y: [1],
-  //   z: [1],
-  // },
-
-  // pumps: {
-  //   // Both tanks
-  //   A: [0, 1],
-    
-  //   // Tank 1
-  //   x: [1],
-  //   y: [1],
-  //   z: [1],
-  // },
-
-  // pumps: {
-  //   // Tank 0
-  //   a: [0],
-  //   b: [0],
-  //   c: [0],
-    
-  //   // Both tanks
-  //   B: [0, 1],
-  // },
+    { label: "3", tanks: [1] },
+  ],
 };
 
 export function validate_MAP_DATA() {
@@ -72,8 +84,10 @@ export function validate_MAP_DATA() {
   }
 
   // Enforce pump count
-  const pumpLabels = Object.keys(MAP_DATA.pumps ?? {});
-  if (!pumpLabels.length) throw new Error('MAP DATA has no pumps.');
+  const pumps = MAP_DATA.pumps ?? [];
+  const pumpLabels = pumps.map(p => p.label);
+  console.log("PUMP LABELS", pumpLabels)
+  if (!pumps.length) throw new Error('MAP DATA has no pumps.');
   if (pumpLabels.length > MAX_PUMPS) {
     throw new Error(`MAP DATA has ${pumpLabels.length} pumps. Max is ${MAX_PUMPS}.`);
   }
@@ -97,9 +111,10 @@ export function validate_MAP_DATA() {
   let topOnlyCount = 0;
   let bottomOnlyCount = 0;
   let phase = 0; // 0 = top-only phase, 1 = both phase, 2 = bottom-only phase
-  for (let i = 0; i < pumpLabels.length; i++) {
-    const label = pumpLabels[i];
-    const conns = MAP_DATA.pumps[label];
+  for (let i = 0; i < pumps.length; i++) {
+    const pump = pumps[i];
+    const label = pump.label;
+    const conns = pump.tanks;
 
     if (!Array.isArray(conns)) throw new Error(`Pump ${label} connections must be an array.`);
     if (conns.length !== 1 && conns.length !== 2) {
