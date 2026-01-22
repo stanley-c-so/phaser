@@ -176,9 +176,30 @@ export function validate_MAP_DATA() {
   }
 
   // Enforce each utility is connected to a valid pump
-  for (const utility of MAP_DATA.utilities) {
+  for (const utility of MAP_DATA.utilities || []) {
     if (!pumpLabels.includes(utility.pump)) {
       throw new Error(`Utility ${utility.label} is connected to invalid pump ${utility.pump}.`);
+    }
+  }
+
+  // Enforce each pump is connected to at least one utility
+  for (const pump of pumpLabels) {
+    if (!(MAP_DATA.utilities || []).some(u => u.pump === pump)) {
+      throw new Error(`Pump ${pump} is not connected to any utility.`);
+    }
+  }
+
+  // Enforce utilities are listed in same order as pumps
+  let currPumpIndex = -1;
+  const utilityPumpOrder = (MAP_DATA.utilities || []).map(u => u.pump);
+  for (let i = 0; i < utilityPumpOrder.length; i++) {
+    const currPump = utilityPumpOrder[i];
+    if (currPumpIndex === -1 || currPump !== pumpLabels[currPumpIndex]) {
+      if (currPumpIndex < pumpLabels.length - 1 && currPump === pumpLabels[currPumpIndex + 1]) {
+        ++currPumpIndex;
+      } else {
+        throw new Error(`Utility ${MAP_DATA.utilities[i].label} is out of order. Expected pump ${pumpLabels[Math.max(currPumpIndex, 0)]}${currPumpIndex === pumpLabels.length - 1 ? "" : ` or ${pumpLabels[currPumpIndex + 1]}`}; got ${currPump}.`);
+      }
     }
   }
 }
