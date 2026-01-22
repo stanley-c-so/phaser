@@ -74,59 +74,56 @@ function drawLine(canvas, x1_at_scale_1, y1_at_scale_1, x2_at_scale_1, y2_at_sca
 }
 
 function drawMap(x_start_pct = 0, x_end_pct = 100, y_start_pct = 0, y_end_pct = 100) {
+  
+  // Determine drawable area
   const drawInnerAreaWidthInCells = this.registry.get("drawInnerAreaWidthInCells");
   const drawInnerAreaHeightInCells = this.registry.get("drawInnerAreaHeightInCells");
   
   const maxCanvasWidthInCells = Math.floor(drawInnerAreaWidthInCells * (x_end_pct - x_start_pct) / 100);
   const maxCanvasHeightInCells = Math.floor(drawInnerAreaHeightInCells * (y_end_pct - y_start_pct) / 100);
   
+  // Calculate minimum dimensions of image in base scale
   const pumpLabels = MAP_DATA.pumps.map(p => p.label);
   const numPumps = pumpLabels.length;
   const heightOfPumps = numPumps * 2 - 1;
 
-  const MIN_TANK_WIDTH = 7;     // arbitrary
-  const MIN_TANK_HEIGHT = 6;    // tank top and bottom, plus 4 layers of liquid
-  const MIN_WIDTH_PIPES = 16;   // staggered pipe connections
+  const MIN_TANK_WIDTH = 7;                   // arbitrary
+  const MIN_TANK_HEIGHT = 6;                  // tank top and bottom, plus 4 layers of liquid
+  const MIN_WIDTH_PIPES_TANKS_TO_PUMPS = 16;  // staggered pipe connections
   
-  const minWidthOfImage = MIN_WIDTH_PIPES + MIN_TANK_WIDTH;
+  const pumpColumn = MIN_TANK_WIDTH + MIN_WIDTH_PIPES_TANKS_TO_PUMPS;
+
+  const minWidthOfImage = MIN_WIDTH_PIPES_TANKS_TO_PUMPS + MIN_TANK_WIDTH;
   const minHeightOfImage = roundUpToOdd(                       // this must be odd
                             Math.max(MIN_TANK_HEIGHT * 2 + 1,  // if the tanks take up more vertical space
                                     heightOfPumps)             // if the pumps take up more vertical space
                             );
   
+  // Canvas too small to draw image
   if (
     maxCanvasWidthInCells < minWidthOfImage
     || maxCanvasHeightInCells < minHeightOfImage
   ) return;
 
-  // console.log("minWidthOfImage", minWidthOfImage)
-  // console.log("minHeightOfImage", minHeightOfImage)
+  const middleRow = Math.floor(minHeightOfImage / 2);
+
+  // Determine largest possible scale factor
   const SCALE = Math.min(
     Math.floor(maxCanvasWidthInCells / minWidthOfImage),
     Math.floor(maxCanvasHeightInCells / minHeightOfImage),
   );
-  console.log(`SCALE: ${SCALE}`);
-
   const canvasWidthInCells = SCALE * minWidthOfImage;
   const canvasHeightInCells = SCALE * minHeightOfImage;
 
   const templateBuffer = Array.from({length: canvasHeightInCells}, () => Array(canvasWidthInCells).fill(" "));
 
-  // // draw corner markers
-  // templateBuffer[0][0] = SCALE;
-  // templateBuffer[0][canvasWidthInCells - 1] = SCALE;
-  // templateBuffer[canvasHeightInCells - 1][0] = SCALE;
-  // templateBuffer[canvasHeightInCells - 1][canvasWidthInCells - 1] = SCALE;
-
-  const middleRow = Math.floor(minHeightOfImage / 2);
-
-  // draw pumps
+  // Draw pumps
   for (let i = 0; i < numPumps; ++i) {
     const pumpLabel = pumpLabels[i];
-    drawAtScale(templateBuffer, minWidthOfImage - 1, middleRow - Math.floor(heightOfPumps / 2) + i * 2, pumpLabel, SCALE);
+    drawAtScale(templateBuffer, pumpColumn - 1, middleRow - Math.floor(heightOfPumps / 2) + i * 2, pumpLabel, SCALE);
   }
   
-  // draw top tank
+  // Draw top tank
   drawAtScale(templateBuffer, 0, middleRow - MIN_TANK_HEIGHT, "┌", SCALE);
   drawAtScale(templateBuffer, MIN_TANK_WIDTH - 1, middleRow - MIN_TANK_HEIGHT, "┐", SCALE);
   drawAtScale(templateBuffer, 0, middleRow - 1, "└", SCALE);
@@ -145,7 +142,7 @@ function drawMap(x_start_pct = 0, x_end_pct = 100, y_start_pct = 0, y_end_pct = 
   }
   drawAtScale(templateBuffer, Math.floor((MIN_TANK_WIDTH - 2) / 2) + 1, middleRow - MIN_TANK_HEIGHT, MAP_DATA.tanks[0], SCALE);
 
-  // draw bottom tank
+  // Draw bottom tank
   drawAtScale(templateBuffer, 0, middleRow + 1, "┌", SCALE);
   drawAtScale(templateBuffer, MIN_TANK_WIDTH - 1, middleRow + 1, "┐", SCALE);
   drawAtScale(templateBuffer, 0, middleRow + MIN_TANK_HEIGHT, "└", SCALE);
@@ -165,9 +162,12 @@ function drawMap(x_start_pct = 0, x_end_pct = 100, y_start_pct = 0, y_end_pct = 
   drawAtScale(templateBuffer, Math.floor((MIN_TANK_WIDTH - 2) / 2) + 1, middleRow + 1, MAP_DATA.tanks[1], SCALE);
   
 
-  // draw critical pipe bend points
+  // Determine candidate pipe bend x-values for tank to pump:
+  // For tank 0, the top outlet stretches out the most, and the bottom outlet stretches out the least, in gradual order.
+  // For tank 1, it is the mirror image.
+  // The manifold appears at least one pump is connected to both tanks. If it exists, it always occupies the innermost outlets of both tanks.
+  const tank0OnlyPumps = [];
   const tank1OnlyPumps = [];
-  const tank2OnlyPumps = [];
   const manifoldPumps = [];
   const pipeBendCoordsByPump = {};
   for (const pump of MAP_DATA.pumps) {
@@ -176,9 +176,9 @@ function drawMap(x_start_pct = 0, x_end_pct = 100, y_start_pct = 0, y_end_pct = 
       manifoldPumps.push(label);
     } else {
       if (pump.tanks[0] === 0) {
-        tank1OnlyPumps.push(label);
+        tank0OnlyPumps.push(label);
       } else {
-        tank2OnlyPumps.push(label);
+        tank1OnlyPumps.push(label);
       }
     }
     pipeBendCoordsByPump[label] = {
@@ -186,67 +186,67 @@ function drawMap(x_start_pct = 0, x_end_pct = 100, y_start_pct = 0, y_end_pct = 
       pumpToTank: null,
     };
   }
-  console.log("tank1OnlyPumps", tank1OnlyPumps)
-  console.log("tank2OnlyPumps", tank2OnlyPumps)
-  console.log("manifoldPumps", manifoldPumps)
-  // console.log("pipeBendCoordsByPump", pipeBendCoordsByPump)
-  for (let i = 0; i < tank1OnlyPumps.length; ++i) {
+  for (let i = 0; i < tank0OnlyPumps.length; ++i) {
     const pumpLabel = pumpLabels[i];
     pipeBendCoordsByPump[pumpLabel].tankToPump = [MIN_TANK_WIDTH + 1 + 6 - 2*i, middleRow - MIN_TANK_HEIGHT + 1 + i];
-    // drawAtScale(templateBuffer, MIN_TANK_WIDTH + 1 + 6 - 2*i, middleRow - MIN_TANK_HEIGHT + 1 + i, ">", SCALE);
   }
-  for (let i = 0; i < tank2OnlyPumps.length; ++i) {
+  for (let i = 0; i < tank1OnlyPumps.length; ++i) {
     const pumpLabel = pumpLabels[numPumps - 1 - i];
     pipeBendCoordsByPump[pumpLabel].tankToPump = [MIN_TANK_WIDTH + 1 + 6 - 2*i, middleRow + MIN_TANK_HEIGHT - 1 - i];
-    // drawAtScale(templateBuffer, MIN_TANK_WIDTH + 1 + 6 - 2*i, middleRow + MIN_TANK_HEIGHT - 1 - i, ">", SCALE);
   }
-
+  // Determine candidate pipe bend x-values for pump to tank:
+  // For the top half, the top pump stretches out the most, and the middle pump stretches out the least, in gradual order.
+  // For the bottom half, it is the mirror image.
   for (let i = 0; i < numPumps; ++i) {
     const pumpLabel = pumpLabels[i];
     if (i < Math.ceil(numPumps / 2)) {
-      pipeBendCoordsByPump[pumpLabel].pumpToTank = [minWidthOfImage - 1 - 2 - 2*(Math.ceil(numPumps / 2) - 1 - i), middleRow - Math.floor(heightOfPumps / 2) + i * 2];
-      // drawAtScale(templateBuffer, minWidthOfImage - 1 - 2 - 2*(Math.ceil(numPumps / 2) - 1 - i), middleRow - Math.floor(heightOfPumps / 2) + i * 2, "<", SCALE);
+      pipeBendCoordsByPump[pumpLabel].pumpToTank = [pumpColumn - 1 - 2 - 2*(Math.ceil(numPumps / 2) - 1 - i), middleRow - Math.floor(heightOfPumps / 2) + i * 2];
     } else {
-      pipeBendCoordsByPump[pumpLabel].pumpToTank = [minWidthOfImage - 1 - 2 - 2*(i - Math.floor(numPumps / 2)), middleRow - Math.floor(heightOfPumps / 2) + i * 2];
-      // drawAtScale(templateBuffer, minWidthOfImage - 1 - 2 - 2*(i - Math.floor(numPumps / 2)), middleRow - Math.floor(heightOfPumps / 2) + i * 2, "<", SCALE);
+      pipeBendCoordsByPump[pumpLabel].pumpToTank = [pumpColumn - 1 - 2 - 2*(i - Math.floor(numPumps / 2)), middleRow - Math.floor(heightOfPumps / 2) + i * 2];
     }
   }
+  // console.log("tank0OnlyPumps", tank0OnlyPumps)
+  // console.log("tank1OnlyPumps", tank1OnlyPumps)
+  // console.log("manifoldPumps", manifoldPumps)
+  // console.log("pipeBendCoordsByPump", pipeBendCoordsByPump)
 
-  console.log("pipeBendCoordsByPump", pipeBendCoordsByPump)
-
-  // ... then, iterate through the pump data structure, and actually draw the stuff out
-
-  // HEURISTIC:
-  // if the pump's bend is closer to the middle than the tank's bend, the pipe should bend closer to the tank
-  // if on the other hand the pump's bend is farther from the middle than the tank's bend, the pipe should bend closer to the pump
-  // --> i think this is equivalent to saying, of the two corner choices where you could ultimately bend, always pick the one vertically closer to the middle
-
+  // Draw the pipes for the non-manifold pumps
+  // Choose the x value of the actual pipe bend based on the tankToPump and pumpToTank candidate coords:
+  // From above, we have two candidate x-values for the pipe bend: one from the tankToPump coords and one from the pumpToTank coords.
+  // If the pump's candidate is closer to the middle of the diagram than the tank's candidate, the pipe should bend closer to the tank.
+  // Conversely, if the pump's candidate is farther from the middle of the diagram than the tank's candidate, the pipe should bend closer to the pump
+  // This is equivalent to saying: of the two candidate x-values where you could ultimately bend, always pick the one vertically closer to the middle of the diagram.
   for (const pumpLabel in pipeBendCoordsByPump) {
-    if (pipeBendCoordsByPump[pumpLabel].pumpToTank === null
-      || pipeBendCoordsByPump[pumpLabel].tankToPump === null
+
+    // Skip manifold tanks
+    if (pipeBendCoordsByPump[pumpLabel].tankToPump === null
     ) {
       continue;
     }
+
     const [x1, y1] = pipeBendCoordsByPump[pumpLabel].tankToPump;
     const [x2, y2] = pipeBendCoordsByPump[pumpLabel].pumpToTank;
+    
+    // The tank's candidate is closer to the middle of the diagram than the pump's candidate
     if (Math.abs(y1 - middleRow) < Math.abs(y2 - middleRow)) {
-      // console.log("CASE 1")
       drawLine(templateBuffer, MIN_TANK_WIDTH - 1, y1, x2, y1, SCALE);
       drawAtScale(templateBuffer, x2, y1, y1 === y2 ? DASH : y1 < middleRow ? BOTTOM_RIGHT : TOP_RIGHT, SCALE);
       drawLine(templateBuffer, x2, y1, x2, y2, SCALE);
       drawAtScale(templateBuffer, x2, y2, y1 === y2 ? DASH : y1 < middleRow ? TOP_LEFT : BOTTOM_LEFT, SCALE);
-      drawLine(templateBuffer, x2, y2, minWidthOfImage - 1, y2, SCALE);
-    } else {
-      // console.log("CASE 2")
+      drawLine(templateBuffer, x2, y2, pumpColumn - 1, y2, SCALE);
+    }
+    
+    // The pump's candidate is closer to the middle of the diagram than the tank's candidate
+    else {
       drawLine(templateBuffer, MIN_TANK_WIDTH - 1, y1, x1, y1, SCALE);
       drawAtScale(templateBuffer, x1, y1, y1 === y2 ? DASH : y1 < middleRow ? TOP_RIGHT : BOTTOM_RIGHT, SCALE);
       drawLine(templateBuffer, x1, y1, x1, y2, SCALE);
       drawAtScale(templateBuffer, x1, y2, y1 === y2 ? DASH : y1 < middleRow ? BOTTOM_LEFT : TOP_LEFT, SCALE);
-      drawLine(templateBuffer, x1, y2, minWidthOfImage - 1, y2, SCALE);
+      drawLine(templateBuffer, x1, y2, pumpColumn - 1, y2, SCALE);
     }
   }
 
-  // TODO: manifold pumps
+  // Draw manifold pump pipes
   if (manifoldPumps.length) {
     const manifoldTop = middleRow - 2;
     const manifoldBottom = middleRow + 2;
@@ -256,45 +256,47 @@ function drawMap(x_start_pct = 0, x_end_pct = 100, y_start_pct = 0, y_end_pct = 
     drawAtScale(templateBuffer, MIN_TANK_WIDTH + 1, manifoldBottom, BOTTOM_RIGHT, SCALE);
     drawLine(templateBuffer, MIN_TANK_WIDTH + 1, manifoldTop, MIN_TANK_WIDTH + 1, manifoldBottom, SCALE);
 
-    // join up all the manifold pumps
+    // Join up all the manifold pumps
     for (let i = 0; i < manifoldPumps.length; ++i) {
       const pumpLabel = manifoldPumps[i];
       const [x, y] = pipeBendCoordsByPump[pumpLabel].pumpToTank;
-      drawAtScale(templateBuffer, minWidthOfImage - 2, y, DASH, SCALE);
+      drawAtScale(templateBuffer, pumpColumn - 2, y, DASH, SCALE);
       if (manifoldPumps.length === 1) {
-        drawAtScale(templateBuffer, minWidthOfImage - 3, y, DASH, SCALE);
+        drawAtScale(templateBuffer, pumpColumn - 3, y, DASH, SCALE);
       } else if (i === 0) {
-        drawAtScale(templateBuffer, minWidthOfImage - 3, y, TOP_LEFT, SCALE);
+        drawAtScale(templateBuffer, pumpColumn - 3, y, TOP_LEFT, SCALE);
       } else if (i === manifoldPumps.length - 1) {
-        drawAtScale(templateBuffer, minWidthOfImage - 3, y, BOTTOM_LEFT, SCALE);
+        drawAtScale(templateBuffer, pumpColumn - 3, y, BOTTOM_LEFT, SCALE);
       } else {
-        drawAtScale(templateBuffer, minWidthOfImage - 3, y, T_RIGHT, SCALE);
+        drawAtScale(templateBuffer, pumpColumn - 3, y, T_RIGHT, SCALE);
       }
     }
 
     const yOfFirstManifoldPump = pipeBendCoordsByPump[manifoldPumps[0]].pumpToTank[1];
     const yOfLastManifoldPump = pipeBendCoordsByPump[manifoldPumps[manifoldPumps.length - 1]].pumpToTank[1];
-    drawLine(templateBuffer, minWidthOfImage - 3, yOfFirstManifoldPump, minWidthOfImage - 3, yOfLastManifoldPump, SCALE);
+    drawLine(templateBuffer, pumpColumn - 3, yOfFirstManifoldPump, pumpColumn - 3, yOfLastManifoldPump, SCALE);
 
-    // EDGE CASE: LAST MANIFOLD PUMP IS ABOVE MANIFOLD TOP
+    // EDGE CASE: Last manifold pump is above manifold top
     if (yOfLastManifoldPump < manifoldTop) {
-      drawAtScale(templateBuffer, minWidthOfImage - 3, manifoldTop, BOTTOM_RIGHT, SCALE);
-      drawAtScale(templateBuffer, minWidthOfImage - 3, yOfLastManifoldPump, TOP_LEFT, SCALE);
+      drawAtScale(templateBuffer, pumpColumn - 3, manifoldTop, BOTTOM_RIGHT, SCALE);
+      drawAtScale(templateBuffer, pumpColumn - 3, yOfLastManifoldPump, TOP_LEFT, SCALE);
       drawAtScale(templateBuffer, MIN_TANK_WIDTH + 1, manifoldTop, T_DOWN, SCALE);
-      drawLine(templateBuffer, minWidthOfImage - 3, manifoldTop, minWidthOfImage - 3, yOfLastManifoldPump, SCALE);
-      drawLine(templateBuffer, MIN_TANK_WIDTH + 1, manifoldTop, minWidthOfImage - 3, manifoldTop, SCALE);
+      drawLine(templateBuffer, pumpColumn - 3, manifoldTop, pumpColumn - 3, yOfLastManifoldPump, SCALE);
+      drawLine(templateBuffer, MIN_TANK_WIDTH + 1, manifoldTop, pumpColumn - 3, manifoldTop, SCALE);
     }
 
-    // EDGE CASE: FIRST MANIFOLD PUMP IS BELOW MANIFOLD BOTTOM
+    // EDGE CASE: First manifold pump is below manifold bottom
     else if (yOfFirstManifoldPump > manifoldBottom) {
-      drawAtScale(templateBuffer, minWidthOfImage - 3, manifoldBottom, TOP_RIGHT, SCALE);
-      drawAtScale(templateBuffer, minWidthOfImage - 3, yOfFirstManifoldPump, BOTTOM_LEFT, SCALE);
+      drawAtScale(templateBuffer, pumpColumn - 3, manifoldBottom, TOP_RIGHT, SCALE);
+      drawAtScale(templateBuffer, pumpColumn - 3, yOfFirstManifoldPump, BOTTOM_LEFT, SCALE);
       drawAtScale(templateBuffer, MIN_TANK_WIDTH + 1, manifoldBottom, T_UP, SCALE);
-      drawLine(templateBuffer, minWidthOfImage - 3, manifoldBottom, minWidthOfImage - 3, yOfFirstManifoldPump, SCALE);
-      drawLine(templateBuffer, MIN_TANK_WIDTH + 1, manifoldBottom, minWidthOfImage - 3, manifoldBottom, SCALE);
+      drawLine(templateBuffer, pumpColumn - 3, manifoldBottom, pumpColumn - 3, yOfFirstManifoldPump, SCALE);
+      drawLine(templateBuffer, MIN_TANK_WIDTH + 1, manifoldBottom, pumpColumn - 3, manifoldBottom, SCALE);
     }
 
+    // Regular case: Of the manifold pumps' y-values in range of the tank manifold, connect at the middle value 
     else {
+      // Find range of manifold pumps' y-values in range of the tank manifold
       let firstYValueInRangeOfManifold = null;
       let lastYValueInRangeOfManifold = null;
       for (let y = yOfFirstManifoldPump; y <= yOfLastManifoldPump; ++y) {
@@ -309,17 +311,23 @@ function drawMap(x_start_pct = 0, x_end_pct = 100, y_start_pct = 0, y_end_pct = 
       if ([firstYValueInRangeOfManifold, lastYValueInRangeOfManifold].includes(null)) {
         throw new Error(`Somehow did not find y value in range of manifold.`);
       }
-      const yOfManifoldToPumpLine = Math.floor((firstYValueInRangeOfManifold + lastYValueInRangeOfManifold) / 2);
-      drawLine(templateBuffer, minWidthOfImage - 3, yOfFirstManifoldPump, minWidthOfImage - 3, yOfLastManifoldPump, SCALE);
-      drawAtScale(templateBuffer, MIN_TANK_WIDTH + 1, yOfManifoldToPumpLine, yOfManifoldToPumpLine === manifoldTop ? T_DOWN : yOfManifoldToPumpLine === manifoldBottom ? T_UP : T_RIGHT, SCALE);
-      drawAtScale(templateBuffer, minWidthOfImage - 3, yOfManifoldToPumpLine, manifoldPumps.length === 1 ? DASH : yOfManifoldToPumpLine === yOfFirstManifoldPump ? T_DOWN : yOfManifoldToPumpLine === yOfLastManifoldPump ? T_UP : T_LEFT, SCALE);
-      drawLine(templateBuffer, MIN_TANK_WIDTH + 1, yOfManifoldToPumpLine, minWidthOfImage - 3, yOfManifoldToPumpLine, SCALE);
-    }
 
+      // Draw the pipe connecting the manifold pumps to the tank
+      const yOfManifoldToPumpLine = Math.floor((firstYValueInRangeOfManifold + lastYValueInRangeOfManifold) / 2);
+      drawLine(templateBuffer, pumpColumn - 3, yOfFirstManifoldPump, pumpColumn - 3, yOfLastManifoldPump, SCALE);
+      drawAtScale(templateBuffer, MIN_TANK_WIDTH + 1, yOfManifoldToPumpLine, yOfManifoldToPumpLine === manifoldTop ? T_DOWN : yOfManifoldToPumpLine === manifoldBottom ? T_UP : T_RIGHT, SCALE);
+      drawAtScale(templateBuffer, pumpColumn - 3, yOfManifoldToPumpLine, manifoldPumps.length === 1 ? DASH : yOfManifoldToPumpLine === yOfFirstManifoldPump ? T_DOWN : yOfManifoldToPumpLine === yOfLastManifoldPump ? T_UP : T_LEFT, SCALE);
+      drawLine(templateBuffer, MIN_TANK_WIDTH + 1, yOfManifoldToPumpLine, pumpColumn - 3, yOfManifoldToPumpLine, SCALE);
+    }
   }
 
+  // // Draw corner markers
+  // templateBuffer[0][0] = "x";
+  // templateBuffer[0][canvasWidthInCells - 1] = "x";
+  // templateBuffer[canvasHeightInCells - 1][0] = "x";
+  // templateBuffer[canvasHeightInCells - 1][canvasWidthInCells - 1] = "x";
 
-  // // draw maxCanvas corner markers
+  // // Draw maxCanvas corner markers
   // const maxCanvasL = clamp(Math.floor(drawInnerAreaWidthInCells * x_start_pct / 100), 0, drawInnerAreaWidthInCells - 1);
   // const maxCanvasR = clamp(Math.floor(drawInnerAreaWidthInCells * x_end_pct / 100), 0, drawInnerAreaWidthInCells - 1);
   // const maxCanvasU = clamp(Math.floor(drawInnerAreaHeightInCells * y_start_pct / 100), 0, drawInnerAreaHeightInCells - 1);
@@ -329,6 +337,7 @@ function drawMap(x_start_pct = 0, x_end_pct = 100, y_start_pct = 0, y_end_pct = 
   // this.buffer[maxCanvasD][maxCanvasL] = "X";
   // this.buffer[maxCanvasD][maxCanvasR] = "X";
 
+  // Translate the template buffer to the actual buffer
   const bufferTranslationOffsetX = Math.floor(drawInnerAreaWidthInCells * x_start_pct / 100 + (maxCanvasWidthInCells - canvasWidthInCells) / 2);
   const bufferTranslationOffsetY = Math.floor(drawInnerAreaHeightInCells * y_start_pct / 100 + (maxCanvasHeightInCells - canvasHeightInCells) / 2);
   for (let row = 0; row < canvasHeightInCells; ++row) {
@@ -337,7 +346,7 @@ function drawMap(x_start_pct = 0, x_end_pct = 100, y_start_pct = 0, y_end_pct = 
     }
   }
 
-  // diagnostic
+  // Diagnostic
   console.log(templateBuffer.map(line => line.join("")).join("\n"))
 }
 
