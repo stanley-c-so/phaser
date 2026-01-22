@@ -85,9 +85,10 @@ export function validate_MAP_DATA() {
   const MAX_TANKS = 2;
   const MAX_PUMPS = 8;
   const MAX_PUMPS_PER_TANK = 4;
+  const MAX_UTILITIES = 8;
 
   // Enforce tank count
-  if (!MAP_DATA.tanks?.length) throw new Error('MAP DATA has no tanks.');
+  if (!MAP_DATA.tanks?.length) throw new Error("MAP DATA has no tanks.");
   if (MAP_DATA.tanks.length !== MAX_TANKS) {
     throw new Error(`MAP DATA must have exactly ${MAX_TANKS} tanks; got ${MAP_DATA.tanks.length}.`);
   }
@@ -95,10 +96,16 @@ export function validate_MAP_DATA() {
   // Enforce pump count
   const pumps = MAP_DATA.pumps ?? [];
   const pumpLabels = pumps.map(p => p.label);
-  console.log("PUMP LABELS", pumpLabels)
-  if (!pumps.length) throw new Error('MAP DATA has no pumps.');
+  if (!pumps.length) throw new Error("MAP DATA has no pumps.");
   if (pumpLabels.length > MAX_PUMPS) {
     throw new Error(`MAP DATA has ${pumpLabels.length} pumps. Max is ${MAX_PUMPS}.`);
+  }
+
+  // Enforce utility count
+  const utilities = MAP_DATA.utilities ?? [];
+  if (!utilities.length) throw new Error("MAP DATA has no utilities.");
+  if (utilities.length > MAX_UTILITIES) {
+    throw new Error(`MAP DATA has ${utilities.length} utilities. Max is ${MAX_UTILITIES}.`);
   }
 
   // Enforce single character tank labels
