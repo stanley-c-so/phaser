@@ -85,7 +85,10 @@ function drawMap(x_start_pct = 0, x_end_pct = 100, y_start_pct = 0, y_end_pct = 
   // Calculate minimum dimensions of image in base scale
   const pumpLabels = MAP_DATA.pumps.map(p => p.label);
   const numPumps = pumpLabels.length;
+  const utilityLabels = MAP_DATA.utilities.map(u => u.label);
+  const numUtilities = utilityLabels.length;
   const heightOfPumps = numPumps * 2 - 1;
+  const heightOfUtilities = numUtilities * 2 - 1;
 
   const MIN_TANK_WIDTH = 7;                   // arbitrary
   const MIN_TANK_HEIGHT = 6;                  // tank top and bottom, plus 4 layers of liquid
@@ -94,9 +97,12 @@ function drawMap(x_start_pct = 0, x_end_pct = 100, y_start_pct = 0, y_end_pct = 
   const pumpColumn = MIN_TANK_WIDTH + MIN_WIDTH_PIPES_TANKS_TO_PUMPS;
 
   const minWidthOfImage = MIN_WIDTH_PIPES_TANKS_TO_PUMPS + MIN_TANK_WIDTH;
-  const minHeightOfImage = roundUpToOdd(                       // this must be odd
-                            Math.max(MIN_TANK_HEIGHT * 2 + 1,  // if the tanks take up more vertical space
-                                    heightOfPumps)             // if the pumps take up more vertical space
+  const minHeightOfImage = roundUpToOdd(                  // this must be odd
+                              Math.max(
+                                MIN_TANK_HEIGHT * 2 + 1,  // if the tanks take up more vertical space
+                                heightOfPumps,            // if the pumps take up more vertical space
+                                heightOfUtilities,        // if the utilities take up more vertical space
+                              )
                             );
   
   // Canvas too small to draw image

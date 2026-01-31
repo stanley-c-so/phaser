@@ -18,44 +18,37 @@ export const T_UP = "┴";          // ┴  (like a T)
 export const T_RIGHT = "├";       // ├  (T pointing right)
 export const T_LEFT = "┤";        // ┤  (T pointing left)
 
-// Optional: full intersection
-const CROSS = "┼";         // ┼
+// // Optional: full intersection
+// export const CROSS = "┼";         // ┼
 
 /*
+
+TANKS TO PUMPS
 
 15 rows, (16 + w) cols where w is width of tank
 
               x───────A
 ┌──1──┐
-│█████│───────x x─────B
+│█████│───────x x─────B          1 (computer)
 │█████│─────x
-│█████│───x       x───C
+│█████│───x       x───C          2 (phone)
 │█████│─x
-└─────┘             x─D
-        x─────x
-┌──2──┐             x─E
+└─────┘             x─D          3 (display)
+        x─────x                 
+┌──2──┐             x─E          4 (the thing that connects to both)
 │█████│─x
-│█████│───x       x───F
+│█████│───x       x───F          5 (power bank)
 │█████│─────x
-│█████│───────x x─────G
+│█████│───────x x─────G          6 (virus analyzer)
 └─────┘
               x───────H
 
-1                     1
-                       
-                       
-                       
-                       
-                       
-                       
-                       
-                       
-                       
-                       
-                       
-                       
-                       
-1                     1
+PUMPS TO UTILITIES
+
+stage 1: ezpz: 1 tank only, just move everything from all devices to one device. have an excess remain just to demonstrate how it works
+stage 2: i need to move shit from device to tank 2 to device that connects to both to tank 1 to the final thing
+stage 3: add a new tank, and now the numbers matter
+
 
 */
 
