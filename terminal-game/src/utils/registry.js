@@ -27,6 +27,8 @@ export function updateRegistryFromScale(scene) {
   
   if (!scene._registryProbeText) {
     scene._registryProbeText = scene.add.text(0, 0, "", makeTextStyle(1)).setVisible(false);
+    scene._registryProbeText.setResolution(1);
+    scene._registryProbeText.setPosition(0, 0);
   }
   const probeText = scene._registryProbeText;
 

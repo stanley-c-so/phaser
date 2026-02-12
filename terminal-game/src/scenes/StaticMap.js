@@ -13,6 +13,52 @@ import { updateRegistryFromScale } from "../utils/registry";
 
 const MAP_START_PCT = { x: 10, y: 12 };
 const CONTROLS_START_PCT = { x: 65, y: 30 };
+const CONTROLS_LINES = [
+  "TOGGLE POWER ROUTER",
+  "",
+  "[ ] A  Primary Containment Seal",
+  "[ ] B  Environmental Comfort Controls",
+  "[ ] C  Administrative Data Archive",
+  "[ ] D  Staff Decontamination Shower",
+  "[ ] E  Inter-wing Power Relay",
+  "[ ] F  Genomic Analysis Array",
+  "[ ] G  Cryogenic Thermal Mass Stabilizer",
+  "[ ] H  Antiviral Synthesis Reactor",
+  "",
+  "[ ] Toggle all junctions",
+  "",
+  "ENGAGE TRANSFER",
+];
+
+function measureControlsLayout(scene, controlsStyle, lines, lineSpacingPx) {
+  if (!scene._controlsMeasureText) {
+    scene._controlsMeasureText = scene.add.text(0, 0, "", controlsStyle).setVisible(false);
+    scene._controlsMeasureText.setResolution(1);
+  }
+
+  const fontSize = controlsStyle.fontSize || "";
+  const cacheKey = `${fontSize}|${lineSpacingPx}|${lines.join("\n")}`;
+  if (scene._controlsMeasureCache?.key === cacheKey) {
+    return scene._controlsMeasureCache.value;
+  }
+
+  const measureText = scene._controlsMeasureText;
+  measureText.setStyle(controlsStyle);
+  measureText.setLineSpacing(lineSpacingPx);
+
+  const longestLine = lines.reduce((longest, line) => (line.length > longest.length ? line : longest), "");
+  measureText.setText(longestLine);
+  const highlightWidth = Math.ceil(measureText.width);
+
+  measureText.setText(lines.join("\n"));
+  const totalLines = Math.max(1, lines.length);
+  const lineStepPx = measureText.height / totalLines;
+  const highlightHeight = Math.max(1, Math.round(lineStepPx));
+
+  const value = { highlightWidth, lineStepPx, highlightHeight };
+  scene._controlsMeasureCache = { key: cacheKey, value };
+  return value;
+}
 
 function drawMap(x_start_pct = 0, y_start_pct = 0) {
   
@@ -163,32 +209,32 @@ function drawMap(x_start_pct = 0, y_start_pct = 0) {
 }
 
 function drawControlsUI(x_start_pct = 0, y_start_pct = 0) {
+  const marginsPx = this.registry.get("marginsPx") || { left: 0, top: 0 };
   const cellWidthPx = this.registry.get("cellWidthPx") || 1;
   const cellHeightPx = this.registry.get("cellHeightPx") || 1;
   const drawInnerAreaWidthInCells = this.registry.get("drawInnerAreaWidthInCells") || 0;
   const drawInnerAreaHeightInCells = this.registry.get("drawInnerAreaHeightInCells") || 0;
-
-  const lines = [
-    "TOGGLE POWER ROUTER",
-    "",
-    "[ ] A  Primary Containment Seal",
-    "[ ] B  Environmental Comfort Controls",
-    "[ ] C  Administrative Data Archive",
-    "[ ] D  Staff Decontamination Shower",
-    "[ ] E  Inter-wing Power Relay",
-    "[ ] F  Genomic Analysis Array",
-    "[ ] G  Cryogenic Thermal Mass Stabilizer",
-    "[ ] H  Antiviral Synthesis Reactor",
-    "",
-    "[ ] Toggle all junctions",
-    "",
-    "ENGAGE TRANSFER",
-  ];
+  const fontSizePx = this.registry.get("fontSizePx") || 1;
+  const controlsFontSizePx = Math.max(1, Math.floor(fontSizePx * 1.5));
+  const controlsStyle = makeTextStyle(controlsFontSizePx);
+  const activeIndex = this.controlsActiveIndex ?? 0;
 
   const offsetX = Math.floor(drawInnerAreaWidthInCells * x_start_pct / 100) * cellWidthPx;
   const offsetY = Math.floor(drawInnerAreaHeightInCells * y_start_pct / 100) * cellHeightPx;
-  const content = lines.join("\n");
-  draw.bind(this)(content, offsetX, offsetY, cellHeightPx * 0.2, makeTextStyle(this.registry.get("fontSizePx") * 1.5));
+  const baseX = Math.round(marginsPx.left + offsetX);
+  const baseY = Math.round(marginsPx.top + offsetY);
+  const lineSpacingPx = Math.max(0, Math.floor(controlsFontSizePx * 0.2));
+  const { highlightWidth, lineStepPx, highlightHeight } = measureControlsLayout(this, controlsStyle, CONTROLS_LINES, lineSpacingPx);
+  const highlightY = Math.round(baseY + activeIndex * lineStepPx);
+
+  const highlight = this.add.rectangle(baseX, highlightY, highlightWidth, highlightHeight, 0x003300).setOrigin(0, 0);
+  this.ui.add(highlight);
+
+  const content = CONTROLS_LINES.join("\n");
+  const text = this.add.text(baseX, baseY, content, controlsStyle);
+  text.setResolution(1);
+  text.setLineSpacing(lineSpacingPx);
+  this.ui.add(text);
 }
 
 export default class StaticMap extends Phaser.Scene {
@@ -201,6 +247,17 @@ export default class StaticMap extends Phaser.Scene {
     console.log("SCALE", this.scale)
 
     updateRegistryFromScale(this);
+    this.controlsActiveIndex = 0;
+    this.input.keyboard.on("keydown-UP", () => {
+      const count = CONTROLS_LINES.length;
+      this.controlsActiveIndex = (this.controlsActiveIndex - 1 + count) % count;
+      this.render();
+    });
+    this.input.keyboard.on("keydown-DOWN", () => {
+      const count = CONTROLS_LINES.length;
+      this.controlsActiveIndex = (this.controlsActiveIndex + 1) % count;
+      this.render();
+    });
     this.render();
 
     this.scale.on("resize", () => {

@@ -51,8 +51,11 @@ stage 3: add a new tank, and now the numbers matter
 
 export function draw(content, offsetXPx = 0, offsetYPx = 0, lineSpacing = 0, textStyle = this.registry.get("textStyle") || makeTextStyle(1)) {
   const marginsPx = this.registry.get("marginsPx") || { left: 0, top: 0 };
-  const text = this.add.text(marginsPx.left + offsetXPx, marginsPx.top + offsetYPx, content, textStyle);
-  if (lineSpacing !== undefined) text.setLineSpacing(Math.max(0, lineSpacing));
+  const x = Math.round(marginsPx.left + offsetXPx);
+  const y = Math.round(marginsPx.top + offsetYPx);
+  const text = this.add.text(x, y, content, textStyle);
+  text.setResolution(1);
+  if (lineSpacing !== undefined) text.setLineSpacing(Math.max(0, Math.round(lineSpacing)));
   this.ui.add(text);
 }
 
