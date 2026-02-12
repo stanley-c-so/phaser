@@ -24,6 +24,8 @@ import {
   putStr,
 } from "../utils/draw";
 
+import { updateRegistryFromScale } from "../utils/registry";
+
 function bufferColumnHeaders(headers) {
   const columnWidth = Math.floor(this.registry.get("drawInnerAreaWidthInCells") / headers.length);
 
@@ -363,9 +365,17 @@ export default class Map extends Phaser.Scene {
 
   create() {
 
+    updateRegistryFromScale(this);
+
+    if (remakeBuffer.bind(this)()) {
+      drawMap.bind(this)();
+    }
+
+    this.render();
+
     this.scale.on("resize", () => {
       // console.log("RESIZE");
-      this.registry.get("resize").bind(this)();
+      updateRegistryFromScale(this);
 
       // recalculate buffer state
       if (remakeBuffer.bind(this)()) {

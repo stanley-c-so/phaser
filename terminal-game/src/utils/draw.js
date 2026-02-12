@@ -1,7 +1,4 @@
-import {
-  MARGINS_IN_PX,
-  TEXT_STYLE,
-} from "../config/constants";
+import { makeTextStyle } from "../config/constants";
 
 export const DASH = "─";
 export const PIPE = "│";
@@ -52,7 +49,16 @@ stage 3: add a new tank, and now the numbers matter
 
 */
 
+export function draw(content, offsetXPx = 0, offsetYPx = 0, lineSpacing = 0, textStyle = this.registry.get("textStyle") || makeTextStyle(1)) {
+  const marginsPx = this.registry.get("marginsPx") || { left: 0, top: 0 };
+  const text = this.add.text(marginsPx.left + offsetXPx, marginsPx.top + offsetYPx, content, textStyle);
+  if (lineSpacing !== undefined) text.setLineSpacing(Math.max(0, lineSpacing));
+  this.ui.add(text);
+}
+
 export function drawBorderBox(borderTitle) {
+  // const textStyle = this.registry.get("textStyle") || makeTextStyle(1);
+  // const marginsPx = this.registry.get("marginsPx") || { left: 0, top: 0 };
 
   const topLeftDashCount = Math.floor((this.registry.get("drawAreaWidthInCells") - borderTitle.length) / 2) - 3;
   const topRightDashCount = Math.ceil((this.registry.get("drawAreaWidthInCells") - borderTitle.length) / 2) - 3;
@@ -82,7 +88,7 @@ export function drawBorderBox(borderTitle) {
     }
   });
 
-  this.ui.add(this.add.text(MARGINS_IN_PX.left, MARGINS_IN_PX.top, lines.join("\n"), TEXT_STYLE));
+  draw.bind(this)(lines.join("\n"));
 };
 
 export function remakeBuffer() {
@@ -99,14 +105,9 @@ export function remakeBuffer() {
 }
 
 export function drawBuffer() {
-  this.ui.add(
-    this.add.text(
-      MARGINS_IN_PX.left + this.registry.get("cellW"),
-      MARGINS_IN_PX.top + this.registry.get("cellH"),
-      this.buffer ? this.buffer.map(line => line.join("")).join("\n") : "",
-      TEXT_STYLE
-    )
-  );
+  const cellWidthPx = this.registry.get("cellWidthPx") || 1;
+  const cellHeightPx = this.registry.get("cellHeightPx") || 1;
+  draw.bind(this)(this.buffer.map(line => line.join("")).join("\n"), cellWidthPx, cellHeightPx);
 }
 
 export function putStr(buffer, x, y, str) {

@@ -1,20 +1,18 @@
 import Phaser from "phaser";
 
 import { COLORS } from "./config/constants";
-import { validate_MAP_DATA } from "./data/map";
-import InitRegistry from "./scenes/InitRegistry";
-import SceneA from "./scenes/SceneA";
-import SceneB from "./scenes/SceneB";
+// import { validate_MAP_DATA } from "./data/map";
 import Map from "./scenes/Map";
+import StaticMap from "./scenes/StaticMap";
+import MatrixRain from "./scenes/MatrixRain";
 
 const config = {
   type: Phaser.AUTO,
   backgroundColor: COLORS.BG,
   scene: [
-    InitRegistry,
+    StaticMap,
     Map,
-    SceneA,
-    SceneB,
+    MatrixRain,
   ],
   scale: {
     // mode: Phaser.Scale.FIT,
@@ -55,9 +53,8 @@ window.addEventListener("keydown", (e) => {
 }, { capture: true });
 
 try {
-  validate_MAP_DATA();
-  game.scene.start("Map");
-  // game.scene.start("SceneB");
+  // validate_MAP_DATA();
+  game.scene.start("StaticMap");
 } catch(e) {
   console.error(e);
 }
