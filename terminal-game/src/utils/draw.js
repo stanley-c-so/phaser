@@ -50,9 +50,10 @@ stage 3: add a new tank, and now the numbers matter
 */
 
 export function draw(content, offsetXPx = 0, offsetYPx = 0, lineSpacing = 0, textStyle = this.registry.get("textStyle") || makeTextStyle(1)) {
-  const marginsPx = this.registry.get("marginsPx") || { left: 0, top: 0 };
-  const x = Math.round(marginsPx.left + offsetXPx);
-  const y = Math.round(marginsPx.top + offsetYPx);
+  // When drawing inside a scaled container, positions are already relative to the container origin.
+  // The container handles margin positioning, so we don't apply marginsPx here.
+  const x = Math.round(offsetXPx);
+  const y = Math.round(offsetYPx);
   const text = this.add.text(x, y, content, textStyle);
   text.setResolution(1);
   if (lineSpacing !== undefined) text.setLineSpacing(Math.max(0, Math.round(lineSpacing)));

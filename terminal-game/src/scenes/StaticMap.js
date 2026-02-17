@@ -209,7 +209,6 @@ function drawMap(x_start_pct = 0, y_start_pct = 0) {
 }
 
 function drawControlsUI(x_start_pct = 0, y_start_pct = 0) {
-  const marginsPx = this.registry.get("marginsPx") || { left: 0, top: 0 };
   const cellWidthPx = this.registry.get("cellWidthPx") || 1;
   const cellHeightPx = this.registry.get("cellHeightPx") || 1;
   const drawInnerAreaWidthInCells = this.registry.get("drawInnerAreaWidthInCells") || 0;
@@ -221,8 +220,8 @@ function drawControlsUI(x_start_pct = 0, y_start_pct = 0) {
 
   const offsetX = Math.floor(drawInnerAreaWidthInCells * x_start_pct / 100) * cellWidthPx;
   const offsetY = Math.floor(drawInnerAreaHeightInCells * y_start_pct / 100) * cellHeightPx;
-  const baseX = Math.round(marginsPx.left + offsetX);
-  const baseY = Math.round(marginsPx.top + offsetY);
+  const baseX = Math.round(offsetX);
+  const baseY = Math.round(offsetY);
   const lineSpacingPx = Math.max(0, Math.floor(controlsFontSizePx * 0.2));
   const { highlightWidth, lineStepPx, highlightHeight } = measureControlsLayout(this, controlsStyle, CONTROLS_LINES, lineSpacingPx);
   const highlightY = Math.round(baseY + activeIndex * lineStepPx);
@@ -270,9 +269,27 @@ export default class StaticMap extends Phaser.Scene {
     this.ui?.removeAll(true);
     this.ui = this.add.container(0, 0);
 
+    const globalScale = this.registry.get("globalScale") || 1;
+    const marginsPx = this.registry.get("marginsPx") || { left: 0, top: 0 };
+
+    // Create inner container for scaled content
+    const contentContainer = this.add.container(0, 0);
+    this.ui.add(contentContainer);
+    contentContainer.setScale(globalScale);
+
+    // Position content container accounting for margins
+    contentContainer.setPosition(marginsPx.left / globalScale, marginsPx.top / globalScale);
+
+    // Temporarily replace this.ui with contentContainer for drawing operations
+    const originalUi = this.ui;
+    this.ui = contentContainer;
+
     drawBorderBox.bind(this)("Puzzle");
     drawMap.bind(this)(MAP_START_PCT.x, MAP_START_PCT.y);
     drawControlsUI.bind(this)(CONTROLS_START_PCT.x, CONTROLS_START_PCT.y);
+
+    // Restore ui reference
+    this.ui = originalUi;
   }
   
 };
