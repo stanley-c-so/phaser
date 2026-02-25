@@ -2,17 +2,19 @@ import Phaser from "phaser";
 
 import { STATIC_MAP_ASCII } from "../data/static-map";
 
-import { EXTRA_MARGINS_IN_PX, TARGET_ASPECT, makeTextStyle } from "../config/constants";
+import { makeTextStyle } from "../config/constants";
 
 import {
   draw,
   drawBorderBox,
 } from "../utils/draw";
 
+import { drawLayoutDebug } from "../utils/debug";
+
 import { updateRegistryFromScale } from "../utils/registry";
 
 const MAP_RECT_PCT = { x0: 0, y0: 0, x1: 55, y1: 100 };
-const CONTROLS_RECT_PCT = { x0: 55, y0: 0, x1: 100, y1: 100 };
+const CONTROLS_RECT_PCT = { x0: 55, y0: 0, x1: 98, y1: 100 };
 const CONTROLS_LINES = [
   "TOGGLE POWER ROUTER",
   "",
@@ -73,50 +75,6 @@ function rectPctToPx(rectPct, parentRectPx) {
   };
 }
 
-function drawLayoutDebug(parentRectPx, mapRectPct, controlsRectPct) {
-  const mapRectPx = rectPctToPx(mapRectPct, parentRectPx);
-  const controlsRectPx = rectPctToPx(controlsRectPct, parentRectPx);
-  const drawAreaRect = this.registry.get("drawAreaRect");
-  const gridOriginPx = this.registry.get("gridOriginPx") || { x: 0, y: 0 };
-  const toUiRect = (rect) => ({
-    x: Math.round(rect.x - gridOriginPx.x),
-    y: Math.round(rect.y - gridOriginPx.y),
-    width: Math.round(rect.width),
-    height: Math.round(rect.height),
-  });
-  const fitRectWithMarginsPx = drawAreaRect ? { ...drawAreaRect } : null;
-  const viewportW = this.scale.width;
-  const viewportH = this.scale.height;
-  const aspect = TARGET_ASPECT.width / TARGET_ASPECT.height;
-  let rawFitW = viewportW;
-  let rawFitH = Math.floor(rawFitW / aspect);
-  if (rawFitH > viewportH) {
-    rawFitH = viewportH;
-    rawFitW = Math.floor(rawFitH * aspect);
-  }
-  const rawFitRectPx = {
-    x: Math.floor((viewportW - rawFitW) / 2),
-    y: Math.floor((viewportH - rawFitH) / 2),
-    width: Math.max(0, rawFitW),
-    height: Math.max(0, rawFitH),
-  };
-  const graphics = this.add.graphics();
-  if (fitRectWithMarginsPx) {
-    graphics.lineStyle(1, 0xff0000, 0.5);
-    const uiRect = toUiRect(fitRectWithMarginsPx);
-    graphics.strokeRect(uiRect.x, uiRect.y, uiRect.width, uiRect.height);
-  }
-  graphics.lineStyle(1, 0xffffff, 0.4);
-  const rawUiRect = toUiRect(rawFitRectPx);
-  graphics.strokeRect(rawUiRect.x, rawUiRect.y, rawUiRect.width, rawUiRect.height);
-  graphics.lineStyle(1, 0xff00ff, 0.6);
-  graphics.strokeRect(parentRectPx.x, parentRectPx.y, parentRectPx.width, parentRectPx.height);
-  graphics.lineStyle(1, 0x00ffff, 0.6);
-  graphics.strokeRect(mapRectPx.x, mapRectPx.y, mapRectPx.width, mapRectPx.height);
-  graphics.lineStyle(1, 0xffff00, 0.6);
-  graphics.strokeRect(controlsRectPx.x, controlsRectPx.y, controlsRectPx.width, controlsRectPx.height);
-  this.ui.add(graphics);
-}
 
 function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
   const cellWidthPx = this.registry.get("cellWidthPx") || 1;
@@ -395,7 +353,7 @@ export default class StaticMap extends Phaser.Scene {
 
     const { innerRectPx } = drawBorderBox.bind(this)("Puzzle");
     if (this.registry.get("debugLayout")) {
-      drawLayoutDebug.bind(this)(innerRectPx, MAP_RECT_PCT, CONTROLS_RECT_PCT);
+      drawLayoutDebug(this, innerRectPx, MAP_RECT_PCT, CONTROLS_RECT_PCT);
     }
     drawMap.bind(this)({ parentRectPx: innerRectPx, rectPct: MAP_RECT_PCT });
     drawControlsUI.bind(this)({ parentRectPx: innerRectPx, rectPct: CONTROLS_RECT_PCT });
