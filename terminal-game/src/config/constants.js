@@ -1,5 +1,22 @@
+import { STATIC_MAP_ASCII } from "../data/static-map";
+import { roundUpToMultiple } from "../utils/pure";
+
 export const TARGET_ASPECT = { width: 4, height: 3 };
-export const DIAGRAM_MIN_GRID = { cols: 70, rows: 40 };
+
+function deriveDiagramMinGrid() {
+  const lines = STATIC_MAP_ASCII.split("\n").filter((line) => line.trim().length > 0);
+  if (lines.length === 0) {
+    return { cols: 0, rows: 0 };
+  }
+  const maxCols = lines.reduce((max, line) => Math.max(max, line.length), 0);
+  const rows = lines.length;
+  return {
+    cols: roundUpToMultiple(maxCols, 10),
+    rows: roundUpToMultiple(rows, 10),
+  };
+}
+
+export const DIAGRAM_MIN_GRID = deriveDiagramMinGrid();
 
 export const EXTRA_MARGINS_IN_PX = {
   top: 50,

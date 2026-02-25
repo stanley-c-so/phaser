@@ -8,3 +8,8 @@ export function clamp(value, low, high) {
     : value > high ? high
     : value;
 };
+
+export function roundUpToMultiple(value, multiple) {
+  if (multiple <= 0) return value;
+  return Math.ceil(value / multiple) * multiple;
+};

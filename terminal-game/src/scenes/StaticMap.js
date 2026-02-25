@@ -27,10 +27,37 @@ const CONTROLS_LINES = [
   "[ ] G  Cryogenic Thermal Mass Stabilizer",
   "[ ] H  Antiviral Synthesis Reactor",
   "",
-  "[ ] Toggle all junctions",
+  "> Toggle all junctions",
   "",
   "ENGAGE TRANSFER",
 ];
+
+const NON_SELECTABLE_CONTROLS = new Set(["TOGGLE POWER ROUTER"]);
+
+function isSelectableControlLine(line) {
+  if (!line) return false;
+  if (!line.trim()) return false;
+  return !NON_SELECTABLE_CONTROLS.has(line.trim());
+}
+
+function getNextSelectableIndex(lines, startIndex, direction) {
+  const count = lines.length;
+  let index = startIndex;
+  for (let i = 0; i < count; i += 1) {
+    index = (index + direction + count) % count;
+    if (isSelectableControlLine(lines[index])) {
+      return index;
+    }
+  }
+  return startIndex;
+}
+
+function normalizeSelectableIndex(lines, index) {
+  if (isSelectableControlLine(lines[index])) {
+    return index;
+  }
+  return getNextSelectableIndex(lines, index, 1);
+}
 
 function measureControlsLayout(scene, controlsStyle, lines, lineSpacingPx) {
   if (!scene._controlsMeasureText) {
@@ -253,7 +280,7 @@ function drawControlsUI({ parentRectPx, rectPct = CONTROLS_RECT_PCT } = {}) {
     height: Math.round(fallbackHeight * cellHeightPx),
   };
   const baseFontSizePx = this.registry.get("fontSizePx") || 1;
-  const activeIndex = this.controlsActiveIndex ?? 0;
+  const normalizedActiveIndex = normalizeSelectableIndex(CONTROLS_LINES, this.controlsActiveIndex ?? 0);
 
   const rectPx = rectPctToPx(rectPct, resolvedParentRectPx);
 
@@ -296,7 +323,7 @@ function drawControlsUI({ parentRectPx, rectPct = CONTROLS_RECT_PCT } = {}) {
   const baseX = Math.round(rectPx.x);
   const centeredY = rectPx.y + Math.max(0, Math.floor((rectPx.height - totalHeightPx) / 2));
   const baseY = Math.round(centeredY);
-  const highlightY = Math.round(baseY + activeIndex * lineStepPx);
+  const highlightY = Math.round(baseY + normalizedActiveIndex * lineStepPx);
   const clampedHighlightWidth = Math.min(highlightWidth, Math.max(0, rectPx.width));
 
   const highlight = this.add.rectangle(baseX, highlightY, clampedHighlightWidth, highlightHeight, 0x003300).setOrigin(0, 0);
@@ -318,19 +345,19 @@ export default class StaticMap extends Phaser.Scene {
 
   create() {
 
-    console.log("SCALE", this.scale)
+    // console.log("SCALE", this.scale)
 
     updateRegistryFromScale(this);
-    this.controlsActiveIndex = 0;
+    this.controlsActiveIndex = normalizeSelectableIndex(CONTROLS_LINES, 0);
     this.input.keyboard.on("keydown-UP", () => {
-      const count = CONTROLS_LINES.length;
-      this.controlsActiveIndex = (this.controlsActiveIndex - 1 + count) % count;
+      this.controlsActiveIndex = getNextSelectableIndex(CONTROLS_LINES, this.controlsActiveIndex, -1);
       this.render();
+      // console.log("this.controlsActiveIndex", this.controlsActiveIndex);
     });
     this.input.keyboard.on("keydown-DOWN", () => {
-      const count = CONTROLS_LINES.length;
-      this.controlsActiveIndex = (this.controlsActiveIndex + 1) % count;
+      this.controlsActiveIndex = getNextSelectableIndex(CONTROLS_LINES, this.controlsActiveIndex, 1);
       this.render();
+      // console.log("this.controlsActiveIndex", this.controlsActiveIndex);
     });
     this.input.keyboard.on("keydown-Q", () => {
       const current = this.registry.get("debugLayout") ?? false;
@@ -351,7 +378,7 @@ export default class StaticMap extends Phaser.Scene {
     const gridOriginPx = this.registry.get("gridOriginPx") || { x: 0, y: 0 };
     this.ui.setPosition(gridOriginPx.x, gridOriginPx.y);
 
-    const { innerRectPx } = drawBorderBox.bind(this)("Puzzle");
+    const { innerRectPx } = drawBorderBox.bind(this)("Power Puzzle");
     if (this.registry.get("debugLayout")) {
       drawLayoutDebug(this, innerRectPx, MAP_RECT_PCT, CONTROLS_RECT_PCT);
     }
