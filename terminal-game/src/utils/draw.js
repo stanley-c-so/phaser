@@ -1,4 +1,4 @@
-import { makeTextStyle } from "../config/constants";
+import { COLORS, TITLE_FONT_SCALE, makeTextStyle } from "../config/constants";
 
 export const DASH = "─";
 export const PIPE = "│";
@@ -72,52 +72,55 @@ export function draw(
 export function drawBorderBox(borderTitle) {
   const widthInCells = this.registry.get("layoutWidthInCells") || this.registry.get("drawAreaWidthInCells");
   const heightInCells = this.registry.get("drawAreaHeightInCells");
+  const cellWidthPx = this.registry.get("cellWidthPx") || 1;
+  const cellHeightPx = this.registry.get("cellHeightPx") || 1;
+  const outerWidthPx = Math.max(0, Math.round(this.registry.get("gridWidthPx") || (widthInCells * cellWidthPx)));
+  const outerHeightPx = Math.max(0, Math.round(this.registry.get("gridHeightPx") || (heightInCells * cellHeightPx)));
+  const textStyle = this.registry.get("textStyle") || makeTextStyle(1);
+  const baseFontSize = parseInt(textStyle.fontSize, 10) || 1;
+  const titleFontSize = Math.max(1, Math.round(baseFontSize * TITLE_FONT_SCALE));
+  const titleTextStyle = makeTextStyle(titleFontSize);
+  titleTextStyle.color = textStyle.color;
+  const strokeColor = typeof textStyle.color === "string"
+    ? parseInt(textStyle.color.replace("#", ""), 16)
+    : 0x00ff00;
+
+  const graphics = this.add.graphics();
+  graphics.lineStyle(1, strokeColor, 1);
+  graphics.strokeRect(0.5, 0.5, Math.max(0, outerWidthPx - 1), Math.max(0, outerHeightPx - 1));
+  this.ui.add(graphics);
 
   const titleBlock = BRACKET_LEFT + " " + borderTitle.toUpperCase() + " " + BRACKET_RIGHT;
-  const totalDashCount = widthInCells - 2 - titleBlock.length;
-  const topLeftDashCount = Math.floor(totalDashCount / 2);
-  const topRightDashCount = totalDashCount - topLeftDashCount;
-  if (topLeftDashCount <= 0 || topRightDashCount <= 0) return;
-  const verticalLineCount = widthInCells - 2;
-  if (verticalLineCount < 0) return;
-
-  const topLine = TOP_LEFT
-    + DASH.repeat(topLeftDashCount)
-    + titleBlock
-    + DASH.repeat(topRightDashCount)
-    + TOP_RIGHT;
-
-  const bottomLine = BOTTOM_LEFT
-    + DASH.repeat(widthInCells - 2)
-    + BOTTOM_RIGHT;
-
-  const lines = Array.from({length: heightInCells}, (_, i) => {
-    if (i === 0) {
-      return topLine;
-    } else if (i < heightInCells - 1) {
-      return PIPE + " ".repeat(verticalLineCount) + PIPE;
-    } else {
-      return bottomLine;
-    }
-  });
-
-  const text = draw.bind(this)(lines.join("\n"));
-  const textWidth = Math.max(0, Math.round(text?.width || 0));
-  const textHeight = Math.max(0, Math.round(text?.height || 0));
-  const glyphWidth = widthInCells > 0 ? textWidth / widthInCells : 0;
-  const glyphHeight = heightInCells > 0 ? textHeight / heightInCells : 0;
+  const titleText = draw.bind(this)(titleBlock, { textStyle: titleTextStyle });
+  if (titleText) {
+    const titleX = Math.round((outerWidthPx - titleText.width) / 2);
+    const titleY = Math.round(-titleText.height / 2);
+    const paddingX = 4;
+    const paddingY = 2;
+    const bg = this.add.graphics();
+    bg.fillStyle(parseInt(COLORS.BG.replace("#", ""), 16), 1);
+    bg.fillRect(
+      Math.round(titleX - paddingX),
+      Math.round(titleY + paddingY),
+      Math.round(titleText.width + paddingX * 2),
+      Math.round(titleText.height - paddingY * 2)
+    );
+    this.ui.add(bg);
+    titleText.setPosition(titleX, titleY);
+    this.ui.bringToTop(titleText);
+  }
 
   const outerRectPx = {
     x: 0,
     y: 0,
-    width: textWidth,
-    height: textHeight,
+    width: outerWidthPx,
+    height: outerHeightPx,
   };
   const innerRectPx = {
-    x: Math.round(glyphWidth),
-    y: Math.round(glyphHeight),
-    width: Math.max(0, Math.round(textWidth - 2 * glyphWidth)),
-    height: Math.max(0, Math.round(textHeight - 2 * glyphHeight)),
+    x: Math.round(cellWidthPx),
+    y: Math.round(cellHeightPx),
+    width: Math.max(0, Math.round(outerWidthPx - 2 * cellWidthPx)),
+    height: Math.max(0, Math.round(outerHeightPx - 2 * cellHeightPx)),
   };
 
   return { outerRectPx, innerRectPx };

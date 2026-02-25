@@ -19,6 +19,8 @@ export const TEXT_STYLE_BASE = {
   color: COLORS.TEXT,
 };
 
+export const TITLE_FONT_SCALE = 1.5;
+
 export function makeTextStyle(cellSizePx) {
   return {
     ...TEXT_STYLE_BASE,

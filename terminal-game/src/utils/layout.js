@@ -137,6 +137,8 @@ export function computeLayout(scene, config = {}) {
     drawAreaWidthInCells,
     drawAreaHeightInCells,
     gridOriginPx,
+    gridWidthPx,
+    gridHeightPx,
     marginsPx,
     canvasW: drawAreaRect.width,
     canvasH: drawAreaRect.height,
@@ -155,6 +157,8 @@ export function updateRegistryFromLayout(scene, layoutInfo) {
   registry.set("marginsPx", layoutInfo.marginsPx);
   registry.set("drawAreaRect", layoutInfo.drawAreaRect);
   registry.set("gridOriginPx", layoutInfo.gridOriginPx);
+  registry.set("gridWidthPx", layoutInfo.gridWidthPx);
+  registry.set("gridHeightPx", layoutInfo.gridHeightPx);
   registry.set("drawAreaWidthInCells", layoutInfo.drawAreaWidthInCells);
   registry.set("drawAreaHeightInCells", layoutInfo.drawAreaHeightInCells);
   registry.set("drawInnerAreaWidthInCells", Math.max(0, layoutInfo.drawAreaWidthInCells - 2));
