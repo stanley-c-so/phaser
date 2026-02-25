@@ -22,7 +22,6 @@ const game = new Phaser.Game(config);
 document.documentElement.style.overflow = "hidden";
 document.body.style.overflow = "hidden";
 document.body.style.margin = "0";
-// document.body.style.backgroundColor = "#FFFFFF";
 document.body.style.backgroundColor = COLORS.BG;
 
 // Also make the canvas not affect document flow

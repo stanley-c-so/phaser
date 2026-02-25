@@ -1,11 +1,11 @@
-export const DRAW_AREA_WIDTH_IN_CELLS = 160;
-export const DRAW_AREA_HEIGHT_IN_CELLS = 50;
+export const TARGET_ASPECT = { width: 4, height: 3 };
+export const DIAGRAM_MIN_GRID = { cols: 70, rows: 40 };
 
 export const EXTRA_MARGINS_IN_PX = {
   top: 50,
   bottom: 50,
-  left: 50,
-  right: 50,
+  left: 0,
+  right: 0,
 };
 
 

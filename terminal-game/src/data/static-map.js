@@ -1,9 +1,6 @@
-// This diagram has min height 35, and min width 39
-// Based on that, we will set the total screen's logical area to 80x50.
-
+// This diagram has min height 35, and min width 62
 // ▓ = battery unit filled
 // ░ = battery unit empty
-
 
 export const STATIC_MAP_ASCII = `
                 ┌─a─┐

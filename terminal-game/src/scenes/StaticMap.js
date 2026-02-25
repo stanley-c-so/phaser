@@ -2,7 +2,7 @@ import Phaser from "phaser";
 
 import { STATIC_MAP_ASCII } from "../data/static-map";
 
-import { makeTextStyle } from "../config/constants";
+import { EXTRA_MARGINS_IN_PX, TARGET_ASPECT, makeTextStyle } from "../config/constants";
 
 import {
   draw,
@@ -11,8 +11,8 @@ import {
 
 import { updateRegistryFromScale } from "../utils/registry";
 
-const MAP_START_PCT = { x: 10, y: 12 };
-const CONTROLS_START_PCT = { x: 65, y: 30 };
+const MAP_RECT_PCT = { x0: 0, y0: 0, x1: 55, y1: 100 };
+const CONTROLS_RECT_PCT = { x0: 55, y0: 0, x1: 100, y1: 100 };
 const CONTROLS_LINES = [
   "TOGGLE POWER ROUTER",
   "",
@@ -60,11 +60,78 @@ function measureControlsLayout(scene, controlsStyle, lines, lineSpacingPx) {
   return value;
 }
 
-function drawMap(x_start_pct = 0, y_start_pct = 0) {
-  
-  // Determine drawable area
-  const drawInnerAreaWidthInCells = this.registry.get("drawInnerAreaWidthInCells");
-  const drawInnerAreaHeightInCells = this.registry.get("drawInnerAreaHeightInCells");
+function rectPctToPx(rectPct, parentRectPx) {
+  const x0 = Math.round(parentRectPx.x + parentRectPx.width * rectPct.x0 / 100);
+  const x1 = Math.round(parentRectPx.x + parentRectPx.width * rectPct.x1 / 100);
+  const y0 = Math.round(parentRectPx.y + parentRectPx.height * rectPct.y0 / 100);
+  const y1 = Math.round(parentRectPx.y + parentRectPx.height * rectPct.y1 / 100);
+  return {
+    x: x0,
+    y: y0,
+    width: Math.max(0, x1 - x0),
+    height: Math.max(0, y1 - y0),
+  };
+}
+
+function drawLayoutDebug(parentRectPx, mapRectPct, controlsRectPct) {
+  const mapRectPx = rectPctToPx(mapRectPct, parentRectPx);
+  const controlsRectPx = rectPctToPx(controlsRectPct, parentRectPx);
+  const drawAreaRect = this.registry.get("drawAreaRect");
+  const gridOriginPx = this.registry.get("gridOriginPx") || { x: 0, y: 0 };
+  const toUiRect = (rect) => ({
+    x: Math.round(rect.x - gridOriginPx.x),
+    y: Math.round(rect.y - gridOriginPx.y),
+    width: Math.round(rect.width),
+    height: Math.round(rect.height),
+  });
+  const fitRectWithMarginsPx = drawAreaRect ? { ...drawAreaRect } : null;
+  const viewportW = this.scale.width;
+  const viewportH = this.scale.height;
+  const aspect = TARGET_ASPECT.width / TARGET_ASPECT.height;
+  let rawFitW = viewportW;
+  let rawFitH = Math.floor(rawFitW / aspect);
+  if (rawFitH > viewportH) {
+    rawFitH = viewportH;
+    rawFitW = Math.floor(rawFitH * aspect);
+  }
+  const rawFitRectPx = {
+    x: Math.floor((viewportW - rawFitW) / 2),
+    y: Math.floor((viewportH - rawFitH) / 2),
+    width: Math.max(0, rawFitW),
+    height: Math.max(0, rawFitH),
+  };
+  const graphics = this.add.graphics();
+  if (fitRectWithMarginsPx) {
+    graphics.lineStyle(1, 0xff0000, 0.5);
+    const uiRect = toUiRect(fitRectWithMarginsPx);
+    graphics.strokeRect(uiRect.x, uiRect.y, uiRect.width, uiRect.height);
+  }
+  graphics.lineStyle(1, 0xffffff, 0.4);
+  const rawUiRect = toUiRect(rawFitRectPx);
+  graphics.strokeRect(rawUiRect.x, rawUiRect.y, rawUiRect.width, rawUiRect.height);
+  graphics.lineStyle(1, 0xff00ff, 0.6);
+  graphics.strokeRect(parentRectPx.x, parentRectPx.y, parentRectPx.width, parentRectPx.height);
+  graphics.lineStyle(1, 0x00ffff, 0.6);
+  graphics.strokeRect(mapRectPx.x, mapRectPx.y, mapRectPx.width, mapRectPx.height);
+  graphics.lineStyle(1, 0xffff00, 0.6);
+  graphics.strokeRect(controlsRectPx.x, controlsRectPx.y, controlsRectPx.width, controlsRectPx.height);
+  this.ui.add(graphics);
+}
+
+function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
+  const cellWidthPx = this.registry.get("cellWidthPx") || 1;
+  const cellHeightPx = this.registry.get("cellHeightPx") || 1;
+  const fallbackWidth = this.registry.get("drawAreaWidthInCells") || 1;
+  const fallbackHeight = this.registry.get("drawAreaHeightInCells") || 1;
+  const resolvedParentRectPx = parentRectPx || {
+    x: 0,
+    y: 0,
+    width: Math.round(fallbackWidth * cellWidthPx),
+    height: Math.round(fallbackHeight * cellHeightPx),
+  };
+
+  const parentWidthInCells = Math.max(1, Math.floor(resolvedParentRectPx.width / cellWidthPx));
+  const parentHeightInCells = Math.max(1, Math.floor(resolvedParentRectPx.height / cellHeightPx));
   
   // Calculate minimum dimensions of image
   const STATIC_MAP_STR = STATIC_MAP_ASCII.split("\n").slice(1, -1);
@@ -73,16 +140,23 @@ function drawMap(x_start_pct = 0, y_start_pct = 0) {
   const mapWidthInCells = STATIC_MAP_ARR[0].length;
   const mapHeightInCells = STATIC_MAP_ARR.length;
   
-  const offsetX = Math.floor(drawInnerAreaWidthInCells * x_start_pct / 100);
-  const offsetY = Math.floor(drawInnerAreaHeightInCells * y_start_pct / 100);
+  const rectPx = rectPctToPx(rectPct, resolvedParentRectPx);
+  const rect = {
+    x: Math.floor((rectPx.x - resolvedParentRectPx.x) / cellWidthPx),
+    y: Math.floor((rectPx.y - resolvedParentRectPx.y) / cellHeightPx),
+    width: Math.floor(rectPx.width / cellWidthPx),
+    height: Math.floor(rectPx.height / cellHeightPx),
+  };
+  const offsetX = rect.x + Math.max(0, Math.floor((rect.width - mapWidthInCells) / 2));
+  const offsetY = rect.y + Math.max(0, Math.floor((rect.height - mapHeightInCells) / 2));
 
   // Canvas too small to draw image
   if (
-    offsetX + mapWidthInCells > drawInnerAreaWidthInCells
-    || offsetY + mapHeightInCells > drawInnerAreaHeightInCells
+    offsetX + mapWidthInCells > rect.x + rect.width
+    || offsetY + mapHeightInCells > rect.y + rect.height
   ) return;
 
-  this.buffer = Array.from({ length: drawInnerAreaHeightInCells }, () => Array(drawInnerAreaWidthInCells).fill(" "));
+  this.buffer = Array.from({ length: parentHeightInCells }, () => Array(parentWidthInCells).fill(" "));
 
   const FILLED_CHAR = "▓";
   const EMPTY_CHAR = "░";
@@ -203,37 +277,80 @@ function drawMap(x_start_pct = 0, y_start_pct = 0) {
   //   this.buffer[row][0] = String(row % 10);
   // }
 
-  const cellWidthPx = this.registry.get("cellWidthPx") || 1;
-  const cellHeightPx = this.registry.get("cellHeightPx") || 1;
-  draw.bind(this)(this.buffer.map(line => line.join("")).join("\n"), cellWidthPx, cellHeightPx);
+  draw.bind(this)(this.buffer.map(line => line.join("")).join("\n"), {
+    offsetXPx: resolvedParentRectPx.x,
+    offsetYPx: resolvedParentRectPx.y,
+  });
 }
 
-function drawControlsUI(x_start_pct = 0, y_start_pct = 0) {
+function drawControlsUI({ parentRectPx, rectPct = CONTROLS_RECT_PCT } = {}) {
   const cellWidthPx = this.registry.get("cellWidthPx") || 1;
   const cellHeightPx = this.registry.get("cellHeightPx") || 1;
-  const drawInnerAreaWidthInCells = this.registry.get("drawInnerAreaWidthInCells") || 0;
-  const drawInnerAreaHeightInCells = this.registry.get("drawInnerAreaHeightInCells") || 0;
-  const fontSizePx = this.registry.get("fontSizePx") || 1;
-  const controlsFontSizePx = Math.max(1, Math.floor(fontSizePx * 1.5));
-  const controlsStyle = makeTextStyle(controlsFontSizePx);
+  const fallbackWidth = this.registry.get("drawAreaWidthInCells") || 1;
+  const fallbackHeight = this.registry.get("drawAreaHeightInCells") || 1;
+  const resolvedParentRectPx = parentRectPx || {
+    x: 0,
+    y: 0,
+    width: Math.round(fallbackWidth * cellWidthPx),
+    height: Math.round(fallbackHeight * cellHeightPx),
+  };
+  const baseFontSizePx = this.registry.get("fontSizePx") || 1;
   const activeIndex = this.controlsActiveIndex ?? 0;
 
-  const offsetX = Math.floor(drawInnerAreaWidthInCells * x_start_pct / 100) * cellWidthPx;
-  const offsetY = Math.floor(drawInnerAreaHeightInCells * y_start_pct / 100) * cellHeightPx;
-  const baseX = Math.round(offsetX);
-  const baseY = Math.round(offsetY);
+  const rectPx = rectPctToPx(rectPct, resolvedParentRectPx);
+
+  const getMaxLineWidthPx = (sizePx, lineSpacingPx) => {
+    if (!this._controlsMeasureText) {
+      this._controlsMeasureText = this.add.text(0, 0, "", makeTextStyle(1)).setVisible(false);
+      this._controlsMeasureText.setResolution(1);
+    }
+    const measureText = this._controlsMeasureText;
+    measureText.setStyle(makeTextStyle(sizePx));
+    measureText.setLineSpacing(lineSpacingPx);
+    let maxWidth = 0;
+    for (const line of CONTROLS_LINES) {
+      measureText.setText(line);
+      maxWidth = Math.max(maxWidth, Math.ceil(measureText.width));
+    }
+    return maxWidth;
+  };
+
+  const fitControlsFontSize = (startPx) => {
+    let sizePx = Math.max(1, Math.floor(startPx));
+    while (sizePx > 1) {
+      const lineSpacingPx = Math.max(0, Math.floor(sizePx * 0.2));
+      const { lineStepPx } = measureControlsLayout(this, makeTextStyle(sizePx), CONTROLS_LINES, lineSpacingPx);
+      const totalHeightPx = Math.round(lineStepPx * CONTROLS_LINES.length);
+      const maxLineWidthPx = getMaxLineWidthPx(sizePx, lineSpacingPx);
+      if (maxLineWidthPx <= rectPx.width && totalHeightPx <= rectPx.height) {
+        break;
+      }
+      sizePx -= 1;
+    }
+    return sizePx;
+  };
+
+  const controlsFontSizePx = fitControlsFontSize(baseFontSizePx * 1.5);
+  const controlsStyle = makeTextStyle(controlsFontSizePx);
   const lineSpacingPx = Math.max(0, Math.floor(controlsFontSizePx * 0.2));
   const { highlightWidth, lineStepPx, highlightHeight } = measureControlsLayout(this, controlsStyle, CONTROLS_LINES, lineSpacingPx);
+  const totalHeightPx = Math.round(lineStepPx * CONTROLS_LINES.length);
+  const baseX = Math.round(rectPx.x);
+  const centeredY = rectPx.y + Math.max(0, Math.floor((rectPx.height - totalHeightPx) / 2));
+  const baseY = Math.round(centeredY);
   const highlightY = Math.round(baseY + activeIndex * lineStepPx);
+  const clampedHighlightWidth = Math.min(highlightWidth, Math.max(0, rectPx.width));
 
-  const highlight = this.add.rectangle(baseX, highlightY, highlightWidth, highlightHeight, 0x003300).setOrigin(0, 0);
+  const highlight = this.add.rectangle(baseX, highlightY, clampedHighlightWidth, highlightHeight, 0x003300).setOrigin(0, 0);
   this.ui.add(highlight);
 
   const content = CONTROLS_LINES.join("\n");
-  const text = this.add.text(baseX, baseY, content, controlsStyle);
-  text.setResolution(1);
-  text.setLineSpacing(lineSpacingPx);
-  this.ui.add(text);
+  draw.bind(this)(content, {
+    offsetXPx: baseX,
+    offsetYPx: baseY,
+    lineSpacing: lineSpacingPx,
+    textStyle: controlsStyle,
+  });
 }
 
 export default class StaticMap extends Phaser.Scene {
@@ -257,6 +374,11 @@ export default class StaticMap extends Phaser.Scene {
       this.controlsActiveIndex = (this.controlsActiveIndex + 1) % count;
       this.render();
     });
+    this.input.keyboard.on("keydown-Q", () => {
+      const current = this.registry.get("debugLayout") ?? false;
+      this.registry.set("debugLayout", !current);
+      this.render();
+    });
     this.render();
 
     this.scale.on("resize", () => {
@@ -268,28 +390,15 @@ export default class StaticMap extends Phaser.Scene {
   render() {
     this.ui?.removeAll(true);
     this.ui = this.add.container(0, 0);
+    const gridOriginPx = this.registry.get("gridOriginPx") || { x: 0, y: 0 };
+    this.ui.setPosition(gridOriginPx.x, gridOriginPx.y);
 
-    const globalScale = this.registry.get("globalScale") || 1;
-    const marginsPx = this.registry.get("marginsPx") || { left: 0, top: 0 };
-
-    // Create inner container for scaled content
-    const contentContainer = this.add.container(0, 0);
-    this.ui.add(contentContainer);
-    contentContainer.setScale(globalScale);
-
-    // Position content container accounting for margins
-    contentContainer.setPosition(marginsPx.left / globalScale, marginsPx.top / globalScale);
-
-    // Temporarily replace this.ui with contentContainer for drawing operations
-    const originalUi = this.ui;
-    this.ui = contentContainer;
-
-    drawBorderBox.bind(this)("Puzzle");
-    drawMap.bind(this)(MAP_START_PCT.x, MAP_START_PCT.y);
-    drawControlsUI.bind(this)(CONTROLS_START_PCT.x, CONTROLS_START_PCT.y);
-
-    // Restore ui reference
-    this.ui = originalUi;
+    const { innerRectPx } = drawBorderBox.bind(this)("Puzzle");
+    if (this.registry.get("debugLayout")) {
+      drawLayoutDebug.bind(this)(innerRectPx, MAP_RECT_PCT, CONTROLS_RECT_PCT);
+    }
+    drawMap.bind(this)({ parentRectPx: innerRectPx, rectPct: MAP_RECT_PCT });
+    drawControlsUI.bind(this)({ parentRectPx: innerRectPx, rectPct: CONTROLS_RECT_PCT });
   }
   
 };
