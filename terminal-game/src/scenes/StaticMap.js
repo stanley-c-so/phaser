@@ -57,19 +57,25 @@ function getStageHeaderLine(stage) {
       return [
         { text: "Set ", color: CONTROLS_COLORS.header },
         { text: "Primary Containment Seal ", color: CONTROLS_COLORS.entity },
-        { text: `power to ${STAGE_GOALS[1].targetLevel}/${STAGE_GOALS[1].targetCapacity}`, color: CONTROLS_COLORS.header }
+        { text: "power to ", color: CONTROLS_COLORS.header },
+        { text: `${STAGE_GOALS[1].targetLevel}`, color: CONTROLS_COLORS.entity },
+        { text: `/${STAGE_GOALS[1].targetCapacity}`, color: CONTROLS_COLORS.header },
       ];
     case 2:
       return [
         { text: "Set ", color: CONTROLS_COLORS.header },
         { text: "Genomic Analysis Array ", color: CONTROLS_COLORS.entity },
-        { text: `power to ${STAGE_GOALS[2].targetLevel}/${STAGE_GOALS[2].targetCapacity}`, color: CONTROLS_COLORS.header }
+        { text: "power to ", color: CONTROLS_COLORS.header },
+        { text: `${STAGE_GOALS[2].targetLevel}`, color: CONTROLS_COLORS.entity },
+        { text: `/${STAGE_GOALS[2].targetCapacity}`, color: CONTROLS_COLORS.header },
       ];
     case 3:
       return [
         { text: "Set ", color: CONTROLS_COLORS.header },
         { text: "Antiviral Synthesis Reactor ", color: CONTROLS_COLORS.entity },
-        { text: `power to ${STAGE_GOALS[3].targetLevel}/${STAGE_GOALS[3].targetCapacity}`, color: CONTROLS_COLORS.header }
+        { text: "power to ", color: CONTROLS_COLORS.header },
+        { text: `${STAGE_GOALS[3].targetLevel}`, color: CONTROLS_COLORS.entity },
+        { text: `/${STAGE_GOALS[3].targetCapacity}`, color: CONTROLS_COLORS.header },
       ];
     default:
       return [
