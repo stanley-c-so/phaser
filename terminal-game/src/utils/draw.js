@@ -64,7 +64,7 @@ export function draw(
   const y = Math.round(offsetYPx);
   const text = this.add.text(x, y, content, textStyle);
   text.setResolution(1);
-  if (lineSpacing !== undefined) text.setLineSpacing(Math.max(0, Math.round(lineSpacing)));
+  if (lineSpacing !== undefined) text.setLineSpacing(Math.round(lineSpacing));
   this.ui.add(text);
   return text;
 }

@@ -2,7 +2,83 @@
 // ▓ = battery unit filled
 // ░ = battery unit empty
 
-export const STATIC_MAP_ASCII = `
+export const STATIC_MAP_ASCII_1 = `
+                ┌ a ┐
+                │   │─────── A ░░░ ░░░ ░░░ ░░░ ░░░
+       ┌────────│ > │
+       │        │   │─────── B ▓▓▓ ▓▓▓ ░░░
+       │        └───┘
+       │
+       │        ┌ b ┐
+┌ 1 ┐  │        │   │─────── C ▓▓▓ ▓▓▓
+│░░░│──┘   ┌────│ > │
+│░░░│      │    │   │─────── D ▓▓▓ ▓▓▓ ░░░
+│░░░│      │    └───┘
+│░░░│──────┘
+└───┘
+`;
+
+export const MAP_CONNECTIONS_1 = {
+  batteryToSwitch: {
+    up: {
+      "1": ["a", "b"],
+    },
+    down: {
+      "1": ["a", "b"],
+    },
+  },
+  switchToUtility: {
+    a: ["A", "B"],
+    b: ["C", "D"],
+  },
+};
+
+export const STATIC_MAP_ASCII_2 = `
+                ┌ a ┐
+                │   │─────── A ░░░ ░░░ ░░░ ░░░ ░░░
+       ┌────────│ > │
+       │        │   │─────── B ▓▓▓ ▓▓▓ ░░░
+       │        └───┘
+       │
+       │        ┌ b ┐
+┌ 1 ┐  │        │   │─────── C ▓▓▓ ▓▓▓
+│░░░│──┘   ┌────│ > │
+│░░░│      │    │   │─────── D ▓▓▓ ▓▓▓ ░░░
+│░░░│      │    └───┘
+│░░░│──────┘
+└───┘           ┌ c ┐
+  └────────┐    │   │
+           \\────│ > │─────── E ▓▓▓ ▓▓▓ ▓▓▓
+           │    │   │
+┌ 2 ┐      │    └───┘
+│░░░│──────┘
+│░░░│           ┌ d ┐
+│░░░│           │   │
+│░░░│───────────│ > │─────── F ░░░ ░░░ ░░░ ░░░
+└───┘           │   │
+                └───┘
+`;
+
+export const MAP_CONNECTIONS_2 = {
+  batteryToSwitch: {
+    up: {
+      "1": ["a", "b", "c"],
+      "2": ["d"]
+    },
+    down: {
+      "1": ["a", "b"],
+      "2": ["c", "d"],
+    },
+  },
+  switchToUtility: {
+    a: ["A", "B"],
+    b: ["C", "D"],
+    c: ["E"],
+    d: ["F"],
+  },
+};
+
+export const STATIC_MAP_ASCII_3 = `
                 ┌ a ┐
                 │   │─────── A ░░░ ░░░ ░░░ ░░░ ░░░
        ┌────────│ > │
@@ -40,7 +116,7 @@ export const STATIC_MAP_ASCII = `
                 └───┘
 `;
 
-export const MAP_CONNECTIONS = {
+export const MAP_CONNECTIONS_3 = {
   batteryToSwitch: {
     up: {
       "1": ["a", "b", "c"],
@@ -62,4 +138,3 @@ export const MAP_CONNECTIONS = {
     f: ["H"],
   },
 };
-

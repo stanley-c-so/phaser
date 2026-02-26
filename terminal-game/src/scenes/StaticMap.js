@@ -1,6 +1,13 @@
 import Phaser from "phaser";
 
-import { MAP_CONNECTIONS, STATIC_MAP_ASCII } from "../data/static-map";
+import {
+  STATIC_MAP_ASCII_1,
+  MAP_CONNECTIONS_1,
+  STATIC_MAP_ASCII_2,
+  MAP_CONNECTIONS_2,
+  STATIC_MAP_ASCII_3,
+  MAP_CONNECTIONS_3,
+} from "../data/static-map";
 
 import { makeTextStyle } from "../config/constants";
 
@@ -20,9 +27,10 @@ const CONTROLS_COLORS = {
   bracket: "#0B7A3A",
   entity: "#6BFF9C",
   label: "#0FAE5A",
-  action_primary: "#00FF88",
+  action_primary: "#00FFFF",
   action_secondary: "#FFFF00",
   active_utility: "#6BFF9C",
+  debug: "#999999",
 };
 
 const MAP_COLORS = {
@@ -31,112 +39,175 @@ const MAP_COLORS = {
   arrow: "#FFFF00",
   junction: "#FFFF00",
   battery: "#CCCC00",
+  utility_locked: "#FFAA33",
 };
 
 const FILLED_CHAR = "▓";
 const EMPTY_CHAR = "░";
 
-const CONTROLS_LINES = [
-  {
-    tokens: [{ text: "Select active utility and transfer direction:", color: CONTROLS_COLORS.header }],
-    selectable: false,
-  },
-  { tokens: [], selectable: false },
-  {
-    tokens: [
-      { text: "( ) ", color: CONTROLS_COLORS.bracket },
-      { text: "A  ", color: CONTROLS_COLORS.entity },
-      { text: "Primary Containment Seal", color: CONTROLS_COLORS.label },
-    ],
-    selectable: true,
-    utilityId: "A",
-  },
-  {
-    tokens: [
-      { text: "( ) ", color: CONTROLS_COLORS.bracket },
-      { text: "B  ", color: CONTROLS_COLORS.entity },
-      { text: "Environmental Comfort Controls", color: CONTROLS_COLORS.label },
-    ],
-    selectable: true,
-    utilityId: "B",
-  },
-  {
-    tokens: [
-      { text: "( ) ", color: CONTROLS_COLORS.bracket },
-      { text: "C  ", color: CONTROLS_COLORS.entity },
-      { text: "Administrative Data Archive", color: CONTROLS_COLORS.label },
-    ],
-    selectable: true,
-    utilityId: "C",
-  },
-  {
-    tokens: [
-      { text: "( ) ", color: CONTROLS_COLORS.bracket },
-      { text: "D  ", color: CONTROLS_COLORS.entity },
-      { text: "Staff Decontamination Shower", color: CONTROLS_COLORS.label },
-    ],
-    selectable: true,
-    utilityId: "D",
-  },
-  {
-    tokens: [
-      { text: "( ) ", color: CONTROLS_COLORS.bracket },
-      { text: "E  ", color: CONTROLS_COLORS.entity },
-      { text: "Inter-wing Power Relay", color: CONTROLS_COLORS.label },
-    ],
-    selectable: true,
-    utilityId: "E",
-  },
-  {
-    tokens: [
-      { text: "( ) ", color: CONTROLS_COLORS.bracket },
-      { text: "F  ", color: CONTROLS_COLORS.entity },
-      { text: "Genomic Analysis Array", color: CONTROLS_COLORS.label },
-    ],
-    selectable: true,
-    utilityId: "F",
-  },
-  {
-    tokens: [
-      { text: "( ) ", color: CONTROLS_COLORS.bracket },
-      { text: "G  ", color: CONTROLS_COLORS.entity },
-      { text: "Cryogenic Thermal Mass Stabilizer", color: CONTROLS_COLORS.label },
-    ],
-    selectable: true,
-    utilityId: "G",
-  },
-  {
-    tokens: [
-      { text: "( ) ", color: CONTROLS_COLORS.bracket },
-      { text: "H  ", color: CONTROLS_COLORS.entity },
-      { text: "Antiviral Synthesis Reactor", color: CONTROLS_COLORS.label },
-    ],
-    selectable: true,
-    utilityId: "H",
-  },
-  { tokens: [], selectable: false },
-  {
-    tokens: [
-      { text: "[ Toggle all junctions ]", color: CONTROLS_COLORS.action_secondary },
-    ],
-    selectable: true,
-    action: "toggle_junctions",
-  },
-  { tokens: [], selectable: false },
-  {
-    tokens: [
-      { text: "[ Toggle all switches ]", color: CONTROLS_COLORS.action_secondary },
-    ],
-    selectable: true,
-    action: "toggle_switches",
-  },
-  { tokens: [], selectable: false },
-  {
-    tokens: [{ text: "[ ENGAGE TRANSFER ]", color: CONTROLS_COLORS.action_primary }],
-    selectable: true,
-    action: "engage_transfer",
-  },
-];
+const STAGE_GOALS = {
+  1: { utilityId: "A", targetLevel: 5, targetCapacity: 5, autoAdvance: true },
+  2: { utilityId: "F", targetLevel: 4, targetCapacity: 4, autoAdvance: true },
+  3: { utilityId: "H", targetLevel: 2, targetCapacity: 3, autoAdvance: false },
+};
+
+function getStageHeaderLine(stage) {
+  switch (stage) {
+    case 1:
+      return [
+        { text: "Set ", color: CONTROLS_COLORS.header },
+        { text: "Primary Containment Seal ", color: CONTROLS_COLORS.entity },
+        { text: `power to ${STAGE_GOALS[1].targetLevel}/${STAGE_GOALS[1].targetCapacity}`, color: CONTROLS_COLORS.header }
+      ];
+    case 2:
+      return [
+        { text: "Set ", color: CONTROLS_COLORS.header },
+        { text: "Genomic Analysis Array ", color: CONTROLS_COLORS.entity },
+        { text: `power to ${STAGE_GOALS[2].targetLevel}/${STAGE_GOALS[2].targetCapacity}`, color: CONTROLS_COLORS.header }
+      ];
+    case 3:
+      return [
+        { text: "Set ", color: CONTROLS_COLORS.header },
+        { text: "Antiviral Synthesis Reactor ", color: CONTROLS_COLORS.entity },
+        { text: `power to ${STAGE_GOALS[3].targetLevel}/${STAGE_GOALS[3].targetCapacity}`, color: CONTROLS_COLORS.header }
+      ];
+    default:
+      return [
+        { text: "", color: CONTROLS_COLORS.header }
+      ];
+  }
+}
+
+function buildControlsLines(stage, hasJunctions, lockedUtilities) {
+  const isLocked = (id) => lockedUtilities?.has?.(id);
+  const lines = [
+    {
+      tokens: [{ text: "GOAL:", color: CONTROLS_COLORS.header }],
+      selectable: false,
+    },
+    {
+      tokens: getStageHeaderLine(stage),
+      selectable: false,
+    },
+    { tokens: [], selectable: false },
+    {
+      tokens: [{ text: "Select active utility and transfer direction:", color: CONTROLS_COLORS.header }],
+      selectable: false,
+    },
+    { tokens: [], selectable: false },
+    {
+      tokens: [
+        { text: "( ) ", color: CONTROLS_COLORS.bracket },
+        { text: "A  ", color: CONTROLS_COLORS.entity },
+        { text: "Primary Containment Seal", color: CONTROLS_COLORS.label },
+      ],
+      selectable: !isLocked("A"),
+      utilityId: "A",
+    },
+    {
+      tokens: [
+        { text: "( ) ", color: CONTROLS_COLORS.bracket },
+        { text: "B  ", color: CONTROLS_COLORS.entity },
+        { text: "Environmental Comfort Controls", color: CONTROLS_COLORS.label },
+      ],
+      selectable: !isLocked("B"),
+      utilityId: "B",
+    },
+    {
+      tokens: [
+        { text: "( ) ", color: CONTROLS_COLORS.bracket },
+        { text: "C  ", color: CONTROLS_COLORS.entity },
+        { text: "Administrative Data Archive", color: CONTROLS_COLORS.label },
+      ],
+      selectable: !isLocked("C"),
+      utilityId: "C",
+    },
+    {
+      tokens: [
+        { text: "( ) ", color: CONTROLS_COLORS.bracket },
+        { text: "D  ", color: CONTROLS_COLORS.entity },
+        { text: "Staff Decontamination Shower", color: CONTROLS_COLORS.label },
+      ],
+      selectable: !isLocked("D"),
+      utilityId: "D",
+    },
+    {
+      tokens: [
+        { text: "( ) ", color: CONTROLS_COLORS.bracket },
+        { text: "E  ", color: CONTROLS_COLORS.entity },
+        { text: "Inter-wing Power Relay", color: CONTROLS_COLORS.label },
+      ],
+      selectable: !isLocked("E"),
+      utilityId: "E",
+    },
+    {
+      tokens: [
+        { text: "( ) ", color: CONTROLS_COLORS.bracket },
+        { text: "F  ", color: CONTROLS_COLORS.entity },
+        { text: "Genomic Analysis Array", color: CONTROLS_COLORS.label },
+      ],
+      selectable: !isLocked("F"),
+      utilityId: "F",
+    },
+    {
+      tokens: [
+        { text: "( ) ", color: CONTROLS_COLORS.bracket },
+        { text: "G  ", color: CONTROLS_COLORS.entity },
+        { text: "Cryogenic Thermal Mass Stabilizer", color: CONTROLS_COLORS.label },
+      ],
+      selectable: !isLocked("G"),
+      utilityId: "G",
+    },
+    {
+      tokens: [
+        { text: "( ) ", color: CONTROLS_COLORS.bracket },
+        { text: "H  ", color: CONTROLS_COLORS.entity },
+        { text: "Antiviral Synthesis Reactor", color: CONTROLS_COLORS.label },
+      ],
+      selectable: !isLocked("H"),
+      utilityId: "H",
+    },
+    { tokens: [], selectable: false },
+    {
+      tokens: [
+        { text: "[ Toggle all switches ]", color: CONTROLS_COLORS.action_secondary },
+      ],
+      selectable: true,
+      action: "toggle_switches",
+    },
+  ];
+
+  if (hasJunctions) {
+    lines.push(
+      { tokens: [], selectable: false },
+      {
+        tokens: [
+          { text: "[ Toggle all junctions ]", color: CONTROLS_COLORS.action_secondary },
+        ],
+        selectable: true,
+        action: "toggle_junctions",
+      }
+    );
+  }
+
+  lines.push(
+    { tokens: [], selectable: false },
+    {
+      tokens: [{ text: "[ ENGAGE TRANSFER ]", color: CONTROLS_COLORS.action_primary }],
+      selectable: true,
+      action: "engage_transfer",
+    },
+
+    // { tokens: [], selectable: false },
+    // {
+    //   tokens: [{ text: "[ DEBUG: NEXT STAGE ]", color: CONTROLS_COLORS.debug }],
+    //   selectable: true,
+    //   action: "next_stage",
+    // }
+  );
+
+  return lines;
+}
 
 function isSelectableControlLine(line) {
   return Boolean(line?.selectable);
@@ -230,6 +301,15 @@ function rectPctToPx(rectPct, parentRectPx) {
   };
 }
 
+function getMapDimensions(mapAscii) {
+  const lines = mapAscii.split("\n").slice(1, -1);
+  const maxLineLength = lines.reduce((max, line) => Math.max(max, line.length), 0);
+  return {
+    width: maxLineLength,
+    height: lines.length,
+  };
+}
+
 function isArrowChar(ch) {
   return ch === ">" || ch === "<";
 }
@@ -250,20 +330,28 @@ function ensurePowerState(scene, parsedStaticMap) {
   if (!scene.powerState) {
     scene.powerState = { batteries: {}, utilities: {} };
   }
+  if (!scene.seenEntities) {
+    scene.seenEntities = {
+      batteries: new Set(),
+      utilities: new Set(),
+    };
+  }
   for (const [id, battery] of Object.entries(parsedStaticMap.batteries || {})) {
-    if (!scene.powerState.batteries[id]) {
+    if (!scene.seenEntities.batteries.has(id)) {
       scene.powerState.batteries[id] = {
         level: battery.level,
         capacity: battery.capacity,
       };
+      scene.seenEntities.batteries.add(id);
     }
   }
   for (const [id, utility] of Object.entries(parsedStaticMap.utilities || {})) {
-    if (!scene.powerState.utilities[id]) {
+    if (!scene.seenEntities.utilities.has(id)) {
       scene.powerState.utilities[id] = {
         level: utility.level,
         capacity: utility.capacity,
       };
+      scene.seenEntities.utilities.add(id);
     }
   }
 }
@@ -321,8 +409,36 @@ function applyPowerStateToMap(mapArr, parsedStaticMap, powerState) {
   }
 }
 
+function buildLockedUtilityMask(mapArr, parsedStaticMap, lockedUtilities, offsetX, offsetY) {
+  if (!lockedUtilities || lockedUtilities.size === 0) {
+    return null;
+  }
+  const mask = new Set();
+  for (const [id, utility] of Object.entries(parsedStaticMap.utilities || {})) {
+    if (!lockedUtilities.has(id)) continue;
+    const positions = getUtilityUnitPositions(mapArr, utility.anchor);
+    for (const colStart of positions) {
+      for (let c = 0; c < 3; c += 1) {
+        const row = utility.anchor.row + offsetY;
+        const col = colStart + c + offsetX;
+        mask.add(`${row},${col}`);
+      }
+    }
+  }
+  return mask;
+}
+
+function buildLockedUtilityLayer(buffer, lockedUtilityMask) {
+  if (!lockedUtilityMask || lockedUtilityMask.size === 0) {
+    return "";
+  }
+  return buffer.map((row, rowIndex) => row.map((ch, colIndex) => (
+    lockedUtilityMask.has(`${rowIndex},${colIndex}`) ? ch : " "
+  )).join("")).join("\n");
+}
+
 function getSwitchForUtility(utilityId) {
-  for (const [switchId, utilities] of Object.entries(MAP_CONNECTIONS.switchToUtility || {})) {
+  for (const [switchId, utilities] of Object.entries(MAP_CONNECTIONS_3.switchToUtility || {})) {
     if (utilities.includes(utilityId)) {
       return switchId;
     }
@@ -332,7 +448,7 @@ function getSwitchForUtility(utilityId) {
 
 function getBatteryForSwitch(switchId, junctionDirection) {
   const junctionState = junctionDirection === "down" ? "down" : "up";
-  const batteryMap = MAP_CONNECTIONS.batteryToSwitch?.[junctionState] || {};
+  const batteryMap = this.currentMapConnections.batteryToSwitch?.[junctionState] || {};
   for (const [batteryId, switches] of Object.entries(batteryMap)) {
     if (switches.includes(switchId)) {
       return batteryId;
@@ -351,7 +467,7 @@ function handleEngageTransfer() {
   const switchId = getSwitchForUtility(activeUtilityId);
   if (!switchId) return;
 
-  const batteryId = getBatteryForSwitch(switchId, this.junctionDirection);
+  const batteryId = getBatteryForSwitch.bind(this)(switchId, this.junctionDirection);
   if (!batteryId) return;
 
   const utilityState = this.powerState.utilities?.[activeUtilityId];
@@ -368,9 +484,64 @@ function handleEngageTransfer() {
 
   fromState.level -= transferAmount;
   toState.level += transferAmount;
-  this.render();
+  const didAdvance = checkStageGoals.bind(this)();
+  if (!didAdvance) {
+    this.render();
+  }
 }
 
+function isGoalMet(goal, utilityState) {
+  if (!goal || !utilityState) return false;
+  if (goal.targetCapacity !== undefined && utilityState.capacity !== goal.targetCapacity) return false;
+  return utilityState.level === goal.targetLevel;
+}
+
+function checkStageGoals() {
+  const goal = STAGE_GOALS[this.stage];
+  if (!goal) return false;
+  if (!this.powerState?.utilities) return false;
+  if (!this.lockedUtilities) {
+    this.lockedUtilities = new Set();
+  }
+  if (!this.completedStages) {
+    this.completedStages = new Set();
+  }
+  if (this.completedStages.has(this.stage)) return false;
+  const utilityState = this.powerState.utilities[goal.utilityId];
+  if (!isGoalMet(goal, utilityState)) return false;
+
+  this.lockedUtilities.add(goal.utilityId);
+  this.completedStages.add(this.stage);
+
+  if (this.activeUtilityId === goal.utilityId) {
+    const controlsLines = buildControlsLines(this.stage, this.hasJunctions, this.lockedUtilities);
+    const nextUtilityLine = controlsLines.find((line) => line?.utilityId && line.selectable);
+    this.activeUtilityId = nextUtilityLine?.utilityId || null;
+  }
+
+  if (goal.autoAdvance) {
+    handleNextStage.bind(this)();
+    return true;
+  }
+
+  this.render();
+  return false;
+}
+
+function handleNextStage() {
+  this.stage += 1;
+  if (this.stage === 2) {
+    this.currentMap = STATIC_MAP_ASCII_2;
+    this.currentMapConnections = MAP_CONNECTIONS_2;
+    this.activeUtilityId = "E";
+  }
+  if (this.stage === 3) {
+    this.currentMap = STATIC_MAP_ASCII_3;
+    this.currentMapConnections = MAP_CONNECTIONS_3;
+    this.activeUtilityId = "G";
+  }
+  this.render();
+}
 
 function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
   const cellWidthPx = this.registry.get("cellWidthPx") || 1;
@@ -383,32 +554,64 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
     width: Math.round(fallbackWidth * cellWidthPx),
     height: Math.round(fallbackHeight * cellHeightPx),
   };
+  const rectPx = rectPctToPx(rectPct, resolvedParentRectPx);
 
-  const parentWidthInCells = Math.max(1, Math.floor(resolvedParentRectPx.width / cellWidthPx));
-  const parentHeightInCells = Math.max(1, Math.floor(resolvedParentRectPx.height / cellHeightPx));
+  const parentWidthInCells = Math.max(
+    1,
+    this.registry.get("drawInnerAreaWidthInCells")
+      || Math.floor(resolvedParentRectPx.width / cellWidthPx)
+  );
+  const parentHeightInCells = Math.max(
+    1,
+    this.registry.get("drawInnerAreaHeightInCells")
+      || Math.floor(resolvedParentRectPx.height / cellHeightPx)
+  );
   
   // Calculate minimum dimensions of image
-  const STATIC_MAP_STR = STATIC_MAP_ASCII.split("\n").slice(1, -1);
+  const STATIC_MAP_STR = this.currentMap.split("\n").slice(1, -1);
   const maxLineLength = STATIC_MAP_STR.reduce((max, line) => Math.max(max, line.length), 0);
   const STATIC_MAP_ARR = STATIC_MAP_STR.map(line => line.padEnd(maxLineLength, " ").split(""));
   const mapWidthInCells = STATIC_MAP_ARR[0].length;
   const mapHeightInCells = STATIC_MAP_ARR.length;
   
-  const rectPx = rectPctToPx(rectPct, resolvedParentRectPx);
+  const rectX0 = Math.round(parentWidthInCells * rectPct.x0 / 100);
+  const rectX1 = Math.round(parentWidthInCells * rectPct.x1 / 100);
+  const rectY0 = Math.round(parentHeightInCells * rectPct.y0 / 100);
+  const rectY1 = Math.round(parentHeightInCells * rectPct.y1 / 100);
   const rect = {
-    x: Math.floor((rectPx.x - resolvedParentRectPx.x) / cellWidthPx),
-    y: Math.floor((rectPx.y - resolvedParentRectPx.y) / cellHeightPx),
-    width: Math.floor(rectPx.width / cellWidthPx),
-    height: Math.floor(rectPx.height / cellHeightPx),
+    x: rectX0,
+    y: rectY0,
+    width: Math.max(0, rectX1 - rectX0),
+    height: Math.max(0, rectY1 - rectY0),
   };
-  const offsetX = rect.x + Math.max(0, Math.floor((rect.width - mapWidthInCells) / 2));
-  const offsetY = rect.y + Math.max(0, Math.floor((rect.height - mapHeightInCells) / 2));
+  const stage3Dims = getMapDimensions(STATIC_MAP_ASCII_3);
+  const anchorX = rect.x + Math.max(0, Math.floor((rect.width - stage3Dims.width) / 2));
+  const anchorY = rect.y + Math.max(0, Math.floor((rect.height - stage3Dims.height) / 2));
+  const offsetX = anchorX;
+  const offsetY = anchorY;
+
+  const fitsInRect = (
+    offsetX + mapWidthInCells <= rect.x + rect.width
+    && offsetY + mapHeightInCells <= rect.y + rect.height
+  );
+  const fitsInParent = (
+    offsetX + mapWidthInCells <= parentWidthInCells
+    && offsetY + mapHeightInCells <= parentHeightInCells
+  );
 
   // Canvas too small to draw image
-  if (
-    offsetX + mapWidthInCells > rect.x + rect.width
-    || offsetY + mapHeightInCells > rect.y + rect.height
-  ) return;
+  if (!fitsInRect && !fitsInParent) return;
+
+  const rootUi = this.ui;
+  const mapContainer = this.add.container(0, 0);
+  rootUi.add(mapContainer);
+  const maskGraphics = this.add.graphics();
+  maskGraphics.fillStyle(0xffffff, 1);
+  maskGraphics.fillRect(rectPx.x, rectPx.y, rectPx.width, rectPx.height);
+  maskGraphics.setVisible(false);
+  rootUi.add(maskGraphics);
+  mapContainer.setMask(maskGraphics.createGeometryMask());
+  this.ui = mapContainer;
 
   this.buffer = Array.from({ length: parentHeightInCells }, () => Array(parentWidthInCells).fill(" "));
 
@@ -486,6 +689,7 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
   }
 
   this.parsedStaticMap = { batteries, switches, utilities, junctions };
+  this.hasJunctions = junctions.length > 0;
   ensurePowerState(this, this.parsedStaticMap);
   applyPowerStateToMap(STATIC_MAP_ARR, this.parsedStaticMap, this.powerState);
   // console.log("YOOOO", this.parsedStaticMap)
@@ -544,6 +748,19 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
     ).join("")).join("\n")
   );
 
+  const toLayerRows = (predicate) => (
+    this.buffer.map((row) => row.map(
+      (ch) => (predicate(ch) ? ch : " ")
+    ).join(""))
+  );
+
+  const lockedUtilityMask = buildLockedUtilityMask(
+    STATIC_MAP_ARR,
+    this.parsedStaticMap,
+    this.lockedUtilities,
+    offsetX,
+    offsetY
+  );
   const baseLayer = this.buffer.map((row) => row.map((ch) => {
     if (isArrowChar(ch)) return " ";
     if (isJunctionChar(ch)) return " ";
@@ -552,26 +769,54 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
     return ch;
   }).join("")).join("\n");
 
+  const batteryLayer = this.buffer.map((row, rowIndex) => row.map((ch, colIndex) => {
+    if (!isBatteryChar(ch)) return " ";
+    if (lockedUtilityMask?.has(`${rowIndex},${colIndex}`)) return " ";
+    return ch;
+  }).join("")).join("\n");
+
   const drawLayer = (content, style) => {
     if (!content || !content.trim()) return;
+    const { lineSpacing, ...textStyle } = style || {};
     draw.bind(this)(content, {
       offsetXPx: baseX,
       offsetYPx: baseY,
-      textStyle: { ...mapTextStyle, ...style },
+      textStyle: { ...mapTextStyle, ...textStyle },
+      lineSpacing,
     });
   };
 
+  const drawLayerByRow = (rows, style) => {
+    if (!rows || rows.length === 0) return;
+    const { lineSpacing, ...textStyle } = style || {};
+    const mergedStyle = { ...mapTextStyle, ...textStyle };
+    for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+      const rowText = rows[rowIndex];
+      if (!rowText || !rowText.trim()) continue;
+      draw.bind(this)(rowText, {
+        offsetXPx: baseX,
+        offsetYPx: baseY + rowIndex * cellHeightPx,
+        textStyle: mergedStyle,
+        lineSpacing,
+      });
+    }
+  };
+
   drawLayer(baseLayer, { color: MAP_COLORS.default });
-  drawLayer(
-    toLayer(isJunctionChar).replace(/[\\/]/g, junctionChar),
-    { color: MAP_COLORS.junction, fontStyle: "bold" }
+  drawLayerByRow(
+    toLayerRows(isJunctionChar).map((row) => row.replace(/[\\/]/g, junctionChar)),
+    { color: MAP_COLORS.junction, stroke: MAP_COLORS.junction, strokeThickness: 1 }
   );
-  drawLayer(
-    toLayer(isArrowChar).replace(/[<>]/g, arrowChar),
-    { color: MAP_COLORS.arrow, fontStyle: "bold" }
+  drawLayerByRow(
+    toLayerRows(isArrowChar).map((row) => row.replace(/[<>]/g, arrowChar)),
+    { color: MAP_COLORS.arrow, stroke: MAP_COLORS.arrow, strokeThickness: 1 }
   );
-  drawLayer(toLayer(isBatteryChar), { color: MAP_COLORS.battery });
+  const lockedUtilityLayer = buildLockedUtilityLayer(this.buffer, lockedUtilityMask);
+  drawLayer(batteryLayer, { color: MAP_COLORS.battery });
+  drawLayer(lockedUtilityLayer, { color: MAP_COLORS.utility_locked });
   drawLayer(toLayer(isLabelChar), { color: MAP_COLORS.label });
+
+  this.ui = rootUi;
 }
 
 function drawControlsUI({ parentRectPx, rectPct = CONTROLS_RECT_PCT } = {}) {
@@ -586,8 +831,10 @@ function drawControlsUI({ parentRectPx, rectPct = CONTROLS_RECT_PCT } = {}) {
     height: Math.round(fallbackHeight * cellHeightPx),
   };
   const baseFontSizePx = this.registry.get("fontSizePx") || 1;
-  const normalizedActiveIndex = normalizeSelectableIndex(CONTROLS_LINES, this.controlsActiveIndex ?? 0);
-  const activeUtilityId = this.activeUtilityId || "A";
+  const controlsLines = this.controlsLines || buildControlsLines(this.stage, this.hasJunctions, this.lockedUtilities);
+  const normalizedActiveIndex = normalizeSelectableIndex(controlsLines, this.controlsActiveIndex ?? 0);
+  const activeUtilityId = this.activeUtilityId;
+  const lockedUtilities = this.lockedUtilities || new Set();
 
   const rectPx = rectPctToPx(rectPct, resolvedParentRectPx);
 
@@ -595,8 +842,8 @@ function drawControlsUI({ parentRectPx, rectPct = CONTROLS_RECT_PCT } = {}) {
     let sizePx = Math.max(1, Math.floor(startPx));
     while (sizePx > 1) {
       const lineSpacingPx = Math.max(0, Math.floor(sizePx * 0.2));
-      const { lineStepPx, maxLineWidth } = measureControlsLayout(this, makeTextStyle(sizePx), CONTROLS_LINES, lineSpacingPx);
-      const totalHeightPx = Math.round(lineStepPx * CONTROLS_LINES.length);
+      const { lineStepPx, maxLineWidth } = measureControlsLayout(this, makeTextStyle(sizePx), controlsLines, lineSpacingPx);
+      const totalHeightPx = Math.round(lineStepPx * controlsLines.length);
       if (maxLineWidth <= rectPx.width && totalHeightPx <= rectPx.height) {
         break;
       }
@@ -608,23 +855,24 @@ function drawControlsUI({ parentRectPx, rectPct = CONTROLS_RECT_PCT } = {}) {
   const controlsFontSizePx = fitControlsFontSize(baseFontSizePx * 1.5);
   const controlsStyle = makeTextStyle(controlsFontSizePx);
   const lineSpacingPx = Math.max(0, Math.floor(controlsFontSizePx * 0.2));
-  const { maxLineWidth, lineStepPx, highlightHeight } = measureControlsLayout(this, controlsStyle, CONTROLS_LINES, lineSpacingPx);
-  const totalHeightPx = Math.round(lineStepPx * CONTROLS_LINES.length);
+  const { maxLineWidth, lineStepPx, highlightHeight } = measureControlsLayout(this, controlsStyle, controlsLines, lineSpacingPx);
+  const totalHeightPx = Math.round(lineStepPx * controlsLines.length);
   const baseX = Math.round(rectPx.x);
   const centeredY = rectPx.y + Math.max(0, Math.floor((rectPx.height - totalHeightPx) / 2));
   const baseY = Math.round(centeredY);
   const highlightY = Math.round(baseY + normalizedActiveIndex * lineStepPx);
-  const activeLineWidth = measureTokenLineWidth(this, controlsStyle, CONTROLS_LINES[normalizedActiveIndex]?.tokens || []);
+  const activeLineWidth = measureTokenLineWidth(this, controlsStyle, controlsLines[normalizedActiveIndex]?.tokens || []);
   const clampedHighlightWidth = Math.min(activeLineWidth || maxLineWidth, Math.max(0, rectPx.width));
 
   const highlight = this.add.rectangle(baseX, highlightY, clampedHighlightWidth, highlightHeight, 0x003300).setOrigin(0, 0);
   this.ui.add(highlight);
 
-  for (let i = 0; i < CONTROLS_LINES.length; i += 1) {
-    const line = CONTROLS_LINES[i];
+  for (let i = 0; i < controlsLines.length; i += 1) {
+    const line = controlsLines[i];
     const lineY = Math.round(baseY + i * lineStepPx);
     let cursorX = baseX;
     const isActiveUtility = line.utilityId && line.utilityId === activeUtilityId;
+    const isLockedUtility = line.utilityId && lockedUtilities.has(line.utilityId);
     for (let tokenIndex = 0; tokenIndex < (line.tokens || []).length; tokenIndex += 1) {
       const token = line.tokens[tokenIndex];
       let tokenColor = token.color || controlsStyle.color;
@@ -632,7 +880,9 @@ function drawControlsUI({ parentRectPx, rectPct = CONTROLS_RECT_PCT } = {}) {
       if (line.utilityId && tokenIndex === 0) {
         tokenTextValue = line.utilityId === activeUtilityId ? "(x) " : "( ) ";
       }
-      if (isActiveUtility) {
+      if (isLockedUtility) {
+        tokenColor = MAP_COLORS.utility_locked;
+      } else if (isActiveUtility) {
         tokenColor = CONTROLS_COLORS.active_utility;
       }
       const tokenStyle = { ...controlsStyle, color: tokenColor };
@@ -658,22 +908,33 @@ export default class StaticMap extends Phaser.Scene {
     // console.log("SCALE", this.scale)
 
     updateRegistryFromScale(this);
+    this.stage = 1;
+    this.currentMap = STATIC_MAP_ASCII_1;
+    this.currentMapConnections = MAP_CONNECTIONS_1;
     this.switchDirection = "right";
     this.junctionDirection = "up";
     this.activeUtilityId = "A";
-    this.controlsActiveIndex = normalizeSelectableIndex(CONTROLS_LINES, 0);
+    this.lockedUtilities = new Set();
+    this.completedStages = new Set();
+    this.controlsLines = buildControlsLines(this.stage, false, this.lockedUtilities);
+    this.controlsActiveIndex = normalizeSelectableIndex(this.controlsLines, 0);
     this.input.keyboard.on("keydown-UP", () => {
-      this.controlsActiveIndex = getNextSelectableIndex(CONTROLS_LINES, this.controlsActiveIndex, -1);
+      const controlsLines = this.controlsLines || buildControlsLines(this.stage, this.hasJunctions, this.lockedUtilities);
+      this.controlsActiveIndex = getNextSelectableIndex(controlsLines, this.controlsActiveIndex, -1);
       this.render();
       // console.log("this.controlsActiveIndex", this.controlsActiveIndex);
     });
     this.input.keyboard.on("keydown-DOWN", () => {
-      this.controlsActiveIndex = getNextSelectableIndex(CONTROLS_LINES, this.controlsActiveIndex, 1);
+      const controlsLines = this.controlsLines || buildControlsLines(this.stage, this.hasJunctions, this.lockedUtilities);
+      this.controlsActiveIndex = getNextSelectableIndex(controlsLines, this.controlsActiveIndex, 1);
       this.render();
       // console.log("this.controlsActiveIndex", this.controlsActiveIndex);
     });
     this.input.keyboard.on("keydown-ENTER", () => {
-      const activeLine = CONTROLS_LINES[this.controlsActiveIndex];
+      const controlsLines = this.controlsLines || buildControlsLines(this.stage, this.hasJunctions, this.lockedUtilities);
+      const normalizedIndex = normalizeSelectableIndex(controlsLines, this.controlsActiveIndex ?? 0);
+      this.controlsActiveIndex = normalizedIndex;
+      const activeLine = controlsLines[normalizedIndex];
       if (activeLine?.utilityId) {
         this.activeUtilityId = activeLine.utilityId;
         this.render();
@@ -691,6 +952,11 @@ export default class StaticMap extends Phaser.Scene {
       }
       if (activeLine?.action === "engage_transfer") {
         handleEngageTransfer.bind(this)();
+        return;
+      }
+      if (activeLine?.action === "next_stage") {
+        handleNextStage.bind(this)();
+        return;
       }
     });
     this.input.keyboard.on("keydown-Q", () => {
@@ -717,6 +983,8 @@ export default class StaticMap extends Phaser.Scene {
       drawLayoutDebug(this, innerRectPx, MAP_RECT_PCT, CONTROLS_RECT_PCT);
     }
     drawMap.bind(this)({ parentRectPx: innerRectPx, rectPct: MAP_RECT_PCT });
+    this.controlsLines = buildControlsLines(this.stage, this.hasJunctions, this.lockedUtilities);
+    this.controlsActiveIndex = normalizeSelectableIndex(this.controlsLines, this.controlsActiveIndex ?? 0);
     drawControlsUI.bind(this)({ parentRectPx: innerRectPx, rectPct: CONTROLS_RECT_PCT });
   }
   

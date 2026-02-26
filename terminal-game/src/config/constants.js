@@ -1,10 +1,10 @@
-import { STATIC_MAP_ASCII } from "../data/static-map";
+import { STATIC_MAP_ASCII_3 } from "../data/static-map";
 import { roundUpToMultiple } from "../utils/pure";
 
 export const TARGET_ASPECT = { width: 4, height: 3 };
 
 function deriveDiagramMinGrid() {
-  const lines = STATIC_MAP_ASCII.split("\n").filter((line) => line.trim().length > 0);
+  const lines = STATIC_MAP_ASCII_3.split("\n").filter((line) => line.trim().length > 0);
   if (lines.length === 0) {
     return { cols: 0, rows: 0 };
   }
