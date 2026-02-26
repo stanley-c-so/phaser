@@ -210,7 +210,7 @@ function buildControlsLines(stage, hasJunctions, lockedUtilities, transferContex
     },
     { tokens: [], selectable: false },
     {
-      tokens: [{ text: "Select active utility and transfer direction:", color: CONTROLS_COLORS.header }],
+      tokens: [{ text: "Select active utility:", color: CONTROLS_COLORS.header }],
       selectable: false,
     },
   ];
@@ -295,7 +295,7 @@ function buildControlsLines(stage, hasJunctions, lockedUtilities, transferContex
     { tokens: [], selectable: false },
     {
       tokens: [
-        { text: "[ Change switch directions ]", color: CONTROLS_COLORS.action_secondary },
+        { text: "[ Change transfer switch directions ]", color: CONTROLS_COLORS.action_secondary },
       ],
       selectable: true,
       action: "toggle_switches",
