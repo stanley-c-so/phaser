@@ -2,7 +2,7 @@ import Phaser from "phaser";
 
 import { STATIC_MAP_ASCII } from "../data/static-map";
 
-import { COLORS, makeTextStyle } from "../config/constants";
+import { makeTextStyle } from "../config/constants";
 
 import {
   draw,
@@ -20,23 +20,17 @@ const CONTROLS_COLORS = {
   bracket: "#0B7A3A",
   entity: "#6BFF9C",
   label: "#0FAE5A",
-  action_primary: "#00FF55",
-  action_secondary: "#AAE36D",
+  action_primary: "#00FF88",
+  action_secondary: "#FFFF00",
+  active_utility: "#6BFF9C",
 };
 
 const MAP_COLORS = {
   default: "#559900",
   label: "#6BFF9C",
-  arrow: "#3CFF6E",
-  junction: "#AAE36D",
+  arrow: "#FFFF00",
+  junction: "#FFFF00",
   battery: "#CCCC00",
-};
-
-const MAP_DRAW = {
-  showArrows: true,
-  showJunctions: true,
-  showLabels: true,
-  showBatteries: true,
 };
 
 const CONTROLS_LINES = [
@@ -47,67 +41,75 @@ const CONTROLS_LINES = [
   { tokens: [], selectable: false },
   {
     tokens: [
-      { text: "[ ] ", color: CONTROLS_COLORS.bracket },
+      { text: "( ) ", color: CONTROLS_COLORS.bracket },
       { text: "A  ", color: CONTROLS_COLORS.entity },
       { text: "Primary Containment Seal", color: CONTROLS_COLORS.label },
     ],
     selectable: true,
+    utilityId: "A",
   },
   {
     tokens: [
-      { text: "[ ] ", color: CONTROLS_COLORS.bracket },
+      { text: "( ) ", color: CONTROLS_COLORS.bracket },
       { text: "B  ", color: CONTROLS_COLORS.entity },
       { text: "Environmental Comfort Controls", color: CONTROLS_COLORS.label },
     ],
     selectable: true,
+    utilityId: "B",
   },
   {
     tokens: [
-      { text: "[ ] ", color: CONTROLS_COLORS.bracket },
+      { text: "( ) ", color: CONTROLS_COLORS.bracket },
       { text: "C  ", color: CONTROLS_COLORS.entity },
       { text: "Administrative Data Archive", color: CONTROLS_COLORS.label },
     ],
     selectable: true,
+    utilityId: "C",
   },
   {
     tokens: [
-      { text: "[ ] ", color: CONTROLS_COLORS.bracket },
+      { text: "( ) ", color: CONTROLS_COLORS.bracket },
       { text: "D  ", color: CONTROLS_COLORS.entity },
       { text: "Staff Decontamination Shower", color: CONTROLS_COLORS.label },
     ],
     selectable: true,
+    utilityId: "D",
   },
   {
     tokens: [
-      { text: "[ ] ", color: CONTROLS_COLORS.bracket },
+      { text: "( ) ", color: CONTROLS_COLORS.bracket },
       { text: "E  ", color: CONTROLS_COLORS.entity },
       { text: "Inter-wing Power Relay", color: CONTROLS_COLORS.label },
     ],
     selectable: true,
+    utilityId: "E",
   },
   {
     tokens: [
-      { text: "[ ] ", color: CONTROLS_COLORS.bracket },
+      { text: "( ) ", color: CONTROLS_COLORS.bracket },
       { text: "F  ", color: CONTROLS_COLORS.entity },
       { text: "Genomic Analysis Array", color: CONTROLS_COLORS.label },
     ],
     selectable: true,
+    utilityId: "F",
   },
   {
     tokens: [
-      { text: "[ ] ", color: CONTROLS_COLORS.bracket },
+      { text: "( ) ", color: CONTROLS_COLORS.bracket },
       { text: "G  ", color: CONTROLS_COLORS.entity },
       { text: "Cryogenic Thermal Mass Stabilizer", color: CONTROLS_COLORS.label },
     ],
     selectable: true,
+    utilityId: "G",
   },
   {
     tokens: [
-      { text: "[ ] ", color: CONTROLS_COLORS.bracket },
+      { text: "( ) ", color: CONTROLS_COLORS.bracket },
       { text: "H  ", color: CONTROLS_COLORS.entity },
       { text: "Antiviral Synthesis Reactor", color: CONTROLS_COLORS.label },
     ],
     selectable: true,
+    utilityId: "H",
   },
   { tokens: [], selectable: false },
   {
@@ -115,6 +117,15 @@ const CONTROLS_LINES = [
       { text: "[ Toggle all junctions ]", color: CONTROLS_COLORS.action_secondary },
     ],
     selectable: true,
+    action: "toggle_junctions",
+  },
+  { tokens: [], selectable: false },
+  {
+    tokens: [
+      { text: "[ Toggle all switches ]", color: CONTROLS_COLORS.action_secondary },
+    ],
+    selectable: true,
+    action: "toggle_switches",
   },
   { tokens: [], selectable: false },
   {
@@ -395,24 +406,20 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
   const baseY = Math.round(resolvedParentRectPx.y);
   const mapTextStyle = this.registry.get("textStyle") || makeTextStyle(1);
 
-  const toLayer = (predicate, include) => {
-    const alternateChars = {
-      "/": "┌",
-      "\\": "└",
-    };
-    return this.buffer.map((row) => row.map(
-      (ch) => (include && predicate(ch)
-        ? (alternateChars[ch] || ch)
-        : " "
-      )
+  const junctionChar = this.junctionDirection === "down" ? "┌" : "└";
+  const arrowChar = this.switchDirection === "left" ? "<" : ">";
+
+  const toLayer = (predicate) => (
+    this.buffer.map((row) => row.map(
+      (ch) => (predicate(ch) ? ch : " ")
     ).join("")).join("\n")
-  };
+  );
 
   const baseLayer = this.buffer.map((row) => row.map((ch) => {
-    if (MAP_DRAW.showArrows && isArrowChar(ch)) return " ";
-    if (MAP_DRAW.showJunctions && isJunctionChar(ch)) return " ";
-    if (MAP_DRAW.showBatteries && isBatteryChar(ch)) return " ";
-    if (MAP_DRAW.showLabels && isLabelChar(ch)) return " ";
+    if (isArrowChar(ch)) return " ";
+    if (isJunctionChar(ch)) return " ";
+    if (isBatteryChar(ch)) return " ";
+    if (isLabelChar(ch)) return " ";
     return ch;
   }).join("")).join("\n");
 
@@ -426,10 +433,16 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
   };
 
   drawLayer(baseLayer, { color: MAP_COLORS.default });
-  drawLayer(toLayer(isJunctionChar, MAP_DRAW.showJunctions), { color: MAP_COLORS.junction, fontStyle: "bold" });
-  drawLayer(toLayer(isArrowChar, MAP_DRAW.showArrows), { color: MAP_COLORS.arrow });
-  drawLayer(toLayer(isBatteryChar, MAP_DRAW.showBatteries), { color: MAP_COLORS.battery });
-  drawLayer(toLayer(isLabelChar, MAP_DRAW.showLabels), { color: MAP_COLORS.label });
+  drawLayer(
+    toLayer(isJunctionChar).replace(/[\\/]/g, junctionChar),
+    { color: MAP_COLORS.junction, fontStyle: "bold" }
+  );
+  drawLayer(
+    toLayer(isArrowChar).replace(/[<>]/g, arrowChar),
+    { color: MAP_COLORS.arrow, fontStyle: "bold" }
+  );
+  drawLayer(toLayer(isBatteryChar), { color: MAP_COLORS.battery });
+  drawLayer(toLayer(isLabelChar), { color: MAP_COLORS.label });
 }
 
 function drawControlsUI({ parentRectPx, rectPct = CONTROLS_RECT_PCT } = {}) {
@@ -445,6 +458,7 @@ function drawControlsUI({ parentRectPx, rectPct = CONTROLS_RECT_PCT } = {}) {
   };
   const baseFontSizePx = this.registry.get("fontSizePx") || 1;
   const normalizedActiveIndex = normalizeSelectableIndex(CONTROLS_LINES, this.controlsActiveIndex ?? 0);
+  const activeUtilityId = this.activeUtilityId || "A";
 
   const rectPx = rectPctToPx(rectPct, resolvedParentRectPx);
 
@@ -481,9 +495,19 @@ function drawControlsUI({ parentRectPx, rectPct = CONTROLS_RECT_PCT } = {}) {
     const line = CONTROLS_LINES[i];
     const lineY = Math.round(baseY + i * lineStepPx);
     let cursorX = baseX;
-    for (const token of line.tokens || []) {
-      const tokenStyle = { ...controlsStyle, color: token.color || controlsStyle.color };
-      const tokenText = draw.bind(this)(token.text, {
+    const isActiveUtility = line.utilityId && line.utilityId === activeUtilityId;
+    for (let tokenIndex = 0; tokenIndex < (line.tokens || []).length; tokenIndex += 1) {
+      const token = line.tokens[tokenIndex];
+      let tokenColor = token.color || controlsStyle.color;
+      let tokenTextValue = token.text;
+      if (line.utilityId && tokenIndex === 0) {
+        tokenTextValue = line.utilityId === activeUtilityId ? "(x) " : "( ) ";
+      }
+      if (isActiveUtility) {
+        tokenColor = CONTROLS_COLORS.active_utility;
+      }
+      const tokenStyle = { ...controlsStyle, color: tokenColor };
+      const tokenText = draw.bind(this)(tokenTextValue, {
         offsetXPx: cursorX,
         offsetYPx: lineY,
         textStyle: tokenStyle,
@@ -505,6 +529,9 @@ export default class StaticMap extends Phaser.Scene {
     // console.log("SCALE", this.scale)
 
     updateRegistryFromScale(this);
+    this.switchDirection = "right";
+    this.junctionDirection = "up";
+    this.activeUtilityId = "A";
     this.controlsActiveIndex = normalizeSelectableIndex(CONTROLS_LINES, 0);
     this.input.keyboard.on("keydown-UP", () => {
       this.controlsActiveIndex = getNextSelectableIndex(CONTROLS_LINES, this.controlsActiveIndex, -1);
@@ -515,6 +542,23 @@ export default class StaticMap extends Phaser.Scene {
       this.controlsActiveIndex = getNextSelectableIndex(CONTROLS_LINES, this.controlsActiveIndex, 1);
       this.render();
       // console.log("this.controlsActiveIndex", this.controlsActiveIndex);
+    });
+    this.input.keyboard.on("keydown-ENTER", () => {
+      const activeLine = CONTROLS_LINES[this.controlsActiveIndex];
+      if (activeLine?.utilityId) {
+        this.activeUtilityId = activeLine.utilityId;
+        this.render();
+        return;
+      }
+      if (activeLine?.action === "toggle_junctions") {
+        this.junctionDirection = this.junctionDirection === "up" ? "down" : "up";
+        this.render();
+        return;
+      }
+      if (activeLine?.action === "toggle_switches") {
+        this.switchDirection = this.switchDirection === "right" ? "left" : "right";
+        this.render();
+      }
     });
     this.input.keyboard.on("keydown-Q", () => {
       const current = this.registry.get("debugLayout") ?? false;
