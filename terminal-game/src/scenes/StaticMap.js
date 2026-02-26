@@ -140,6 +140,62 @@ function getTransferStatusTokens(transferStatus) {
   return [{ text: transferStatus.message, color }];
 }
 
+function clearTransferStatusTimer(scene) {
+  if (scene.transferStatusTimer) {
+    scene.transferStatusTimer.remove(false);
+    scene.transferStatusTimer = null;
+  }
+}
+
+function clearTransferStatusTypingTimer(scene) {
+  if (scene.transferStatusTypingTimer) {
+    scene.transferStatusTypingTimer.remove(false);
+    scene.transferStatusTypingTimer = null;
+  }
+}
+
+function scheduleTransferStatusClear(scene) {
+  clearTransferStatusTimer(scene);
+  scene.transferStatusTimer = scene.time.delayedCall(5000, () => {
+    scene.transferStatus = { message: "", type: "ok" };
+    scene.transferStatusTimer = null;
+    scene.render();
+  });
+}
+
+function setTransferStatus(scene, status) {
+  clearTransferStatusTimer(scene);
+  clearTransferStatusTypingTimer(scene);
+  const fullMessage = status?.message || "";
+  scene.transferStatus = {
+    message: "",
+    fullMessage,
+    type: status?.type || "ok",
+  };
+  if (!fullMessage) {
+    scene.render();
+    return;
+  }
+
+  let index = 0;
+  const typeIntervalMs = 25;
+  scene.transferStatusTypingTimer = scene.time.addEvent({
+    delay: typeIntervalMs,
+    loop: true,
+    callback: () => {
+      index += 1;
+      scene.transferStatus.message = fullMessage.slice(0, index);
+      scene.render();
+      if (index >= fullMessage.length) {
+        clearTransferStatusTypingTimer(scene);
+        if (scene.transferStatus.type === "error") {
+          scheduleTransferStatusClear(scene);
+        }
+      }
+    },
+  });
+}
+
 function buildControlsLines(stage, hasJunctions, lockedUtilities, transferContext) {
   const isLocked = (id) => lockedUtilities?.has?.(id);
   const availableUtilities = getAvailableUtilities(transferContext?.mapConnections);
@@ -575,11 +631,11 @@ function handleEngageTransfer() {
   const transferAmount = Math.min(available, remaining);
   if (transferAmount <= 0) {
     if (available <= 0) {
-      this.transferStatus = { message: `ERROR: no power in ${fromLabel}`, type: "error" };
+      setTransferStatus(this, { message: `ERROR: no power in ${fromLabel}`, type: "error" });
     } else if (remaining <= 0) {
-      this.transferStatus = { message: `ERROR: ${toLabel} is full`, type: "error" };
+      setTransferStatus(this, { message: `ERROR: ${toLabel} is full`, type: "error" });
     } else {
-      this.transferStatus = { message: "ERROR: transfer blocked", type: "error" };
+      setTransferStatus(this, { message: "ERROR: transfer blocked", type: "error" });
     }
     this.render();
     return;
@@ -587,10 +643,10 @@ function handleEngageTransfer() {
 
   fromState.level -= transferAmount;
   toState.level += transferAmount;
-  this.transferStatus = {
+  setTransferStatus(this, {
     message: `Transferred ${transferAmount} unit${transferAmount === 1 ? "" : "s"} from ${fromLabel} to ${toLabel}`,
     type: "ok",
-  };
+  });
   const didAdvance = checkStageGoals.bind(this)();
   if (!didAdvance) {
     this.render();
@@ -653,7 +709,9 @@ function handleNextStage() {
     this.currentMapConnections = MAP_CONNECTIONS_3;
     this.activeUtilityId = "G";
   }
-  // this.transferStatus = { message: "", type: "ok" };
+  clearTransferStatusTimer(this);
+  clearTransferStatusTypingTimer(this);
+  this.transferStatus = { message: "", type: "ok" };
   this.render();
 }
 
