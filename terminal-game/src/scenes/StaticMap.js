@@ -365,52 +365,79 @@ function normalizeSelectableIndex(lines, index) {
   return getNextSelectableIndex(lines, index, 1);
 }
 
-function getMeasureText(scene, controlsStyle) {
-  if (!scene._controlsMeasureText) {
-    scene._controlsMeasureText = scene.add.text(0, 0, "", controlsStyle).setVisible(false);
-    scene._controlsMeasureText.setResolution(1);
-  }
-  return scene._controlsMeasureText;
-}
-
-function getMapMeasureText(scene, textStyle) {
-  if (!scene._mapMeasureText) {
-    scene._mapMeasureText = scene.add.text(0, 0, "", textStyle).setVisible(false);
-    scene._mapMeasureText.setResolution(1);
-  }
-  return scene._mapMeasureText;
+function getCanvasFontFromStyle(textStyle = {}) {
+  const fontSizeRaw = textStyle.fontSize ?? 1;
+  const fontSize = typeof fontSizeRaw === "number"
+    ? fontSizeRaw
+    : parseFloat(String(fontSizeRaw).replace("px", "")) || 1;
+  const fontFamily = textStyle.fontFamily || "monospace";
+  return `${fontSize}px ${fontFamily}`;
 }
 
 function measureMapMaxLineWidthPx(scene, textStyle, lines) {
-  const measureText = getMapMeasureText(scene, textStyle);
-  measureText.setStyle(textStyle);
-  measureText.setLineSpacing(0);
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return Math.ceil((lines?.reduce((max, line) => Math.max(max, (line || "").length), 0) || 0) * 8);
+  }
+  ctx.font = getCanvasFontFromStyle(textStyle);
   let maxWidth = 0;
-  for (const line of lines) {
-    measureText.setText(line);
-    maxWidth = Math.max(maxWidth, measureText.width);
+  for (const line of (lines || [])) {
+    maxWidth = Math.max(maxWidth, ctx.measureText(line || "").width);
   }
   return Math.ceil(maxWidth);
 }
 
+function measureMapBlockHeightPx(scene, textStyle, lines) {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    const fontSizeRaw = textStyle?.fontSize ?? 1;
+    const fontSize = typeof fontSizeRaw === "number"
+      ? fontSizeRaw
+      : parseFloat(String(fontSizeRaw).replace("px", "")) || 1;
+    return Math.ceil((lines?.length || 0) * fontSize);
+  }
+
+  ctx.font = getCanvasFontFromStyle(textStyle);
+  const metrics = ctx.measureText("M");
+  const fontSizeRaw = textStyle?.fontSize ?? 1;
+  const fontSize = typeof fontSizeRaw === "number"
+    ? fontSizeRaw
+    : parseFloat(String(fontSizeRaw).replace("px", "")) || 1;
+  const lineHeight = textStyle?.lineHeight || (metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent) || fontSize;
+  return Math.ceil((lines?.length || 0) * lineHeight);
+}
+
 function measureTokenLineWidth(scene, controlsStyle, tokens) {
-  const measureText = getMeasureText(scene, controlsStyle);
-  measureText.setStyle(controlsStyle);
-  measureText.setLineSpacing(0);
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    const fallbackChars = (tokens || []).reduce((count, token) => count + ((token?.text || "").length), 0);
+    return Math.ceil(fallbackChars * 8);
+  }
+  ctx.font = getCanvasFontFromStyle(controlsStyle);
   let width = 0;
-  for (const token of tokens) {
-    measureText.setText(token.text);
-    width += Math.ceil(measureText.width);
+  for (const token of (tokens || [])) {
+    width += Math.ceil(ctx.measureText(token?.text || "").width);
   }
   return width;
 }
 
 function measureLineStepPx(scene, controlsStyle, lineSpacingPx) {
-  const measureText = getMeasureText(scene, controlsStyle);
-  measureText.setStyle(controlsStyle);
-  measureText.setLineSpacing(lineSpacingPx);
-  measureText.setText("M\nM");
-  return measureText.height / 2;
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  const fontSizeRaw = controlsStyle?.fontSize ?? 1;
+  const fontSize = typeof fontSizeRaw === "number"
+    ? fontSizeRaw
+    : parseFloat(String(fontSizeRaw).replace("px", "")) || 1;
+  if (!ctx) {
+    return Math.max(1, fontSize + (lineSpacingPx || 0));
+  }
+  ctx.font = getCanvasFontFromStyle(controlsStyle);
+  const metrics = ctx.measureText("M");
+  const glyphHeight = (metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent) || fontSize;
+  return Math.max(1, glyphHeight + (lineSpacingPx || 0));
 }
 
 function measureControlsLayout(scene, controlsStyle, lines, lineSpacingPx) {
@@ -728,73 +755,62 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
   };
   const rectPx = rectPctToPx(rectPct, resolvedParentRectPx);
 
-  const parentWidthInCells = Math.max(
-    1,
-    this.registry.get("drawInnerAreaWidthInCells")
-      || Math.floor(resolvedParentRectPx.width / cellWidthPx)
-  );
-  const parentHeightInCells = Math.max(
-    1,
-    this.registry.get("drawInnerAreaHeightInCells")
-      || Math.floor(resolvedParentRectPx.height / cellHeightPx)
-  );
-  
   // Calculate minimum dimensions of image
   const STATIC_MAP_STR = this.currentMap.split("\n").slice(1, -1);
+  const STAGE3_STR = STATIC_MAP_ASCII_3.split("\n").slice(1, -1);
   const maxLineLength = STATIC_MAP_STR.reduce((max, line) => Math.max(max, line.length), 0);
   const STATIC_MAP_ARR = STATIC_MAP_STR.map(line => line.padEnd(maxLineLength, " ").split(""));
   const mapWidthInCells = STATIC_MAP_ARR[0].length;
   const mapHeightInCells = STATIC_MAP_ARR.length;
-  const mapTextStyle = this.registry.get("textStyle") || makeTextStyle(1);
+  const baseFontSizePx = this.registry.get("fontSizePx") || parseInt((this.registry.get("textStyle") || {}).fontSize, 10) || 1;
+
+  const fitMapFontSize = (startPx) => {
+    let sizePx = Math.max(1, Math.floor(startPx));
+    while (sizePx > 1) {
+      const style = makeTextStyle(sizePx);
+      const widthPx = measureMapMaxLineWidthPx(this, style, STATIC_MAP_STR);
+      const heightPx = measureMapBlockHeightPx(this, style, STATIC_MAP_STR);
+      if (widthPx <= rectPx.width && heightPx <= rectPx.height) {
+        break;
+      }
+      sizePx -= 1;
+    }
+    return sizePx;
+  };
+
+  const mapFontSizePx = fitMapFontSize(baseFontSizePx);
+  const mapTextStyle = makeTextStyle(mapFontSizePx);
   const mapWidthPx = measureMapMaxLineWidthPx(this, mapTextStyle, STATIC_MAP_STR);
-  const mapHeightPx = Math.ceil(mapHeightInCells * cellHeightPx);
-  
-  const rectX0 = Math.round(parentWidthInCells * rectPct.x0 / 100);
-  const rectX1 = Math.round(parentWidthInCells * rectPct.x1 / 100);
-  const rectY0 = Math.round(parentHeightInCells * rectPct.y0 / 100);
-  const rectY1 = Math.round(parentHeightInCells * rectPct.y1 / 100);
-  const rect = {
-    x: rectX0,
-    y: rectY0,
-    width: Math.max(0, rectX1 - rectX0),
-    height: Math.max(0, rectY1 - rectY0),
-  };
-  const clipRectPx = {
-    x: rectPx.x,
-    y: rectPx.y,
-    width: Math.max(rectPx.width, resolvedParentRectPx.width - rectPx.x),
-    height: Math.min(resolvedParentRectPx.height, Math.max(rectPx.height, mapHeightPx)),
-  };
-  const stage3Dims = getMapDimensions(STATIC_MAP_ASCII_3);
-  const anchorX = rect.x + Math.max(0, Math.floor((rect.width - stage3Dims.width) / 2));
-  const anchorY = rect.y + Math.max(0, Math.floor((rect.height - stage3Dims.height) / 2));
-  const offsetX = anchorX;
-  const offsetY = anchorY;
+  const mapHeightPx = measureMapBlockHeightPx(this, mapTextStyle, STATIC_MAP_STR);
+
+  const targetWidthPx = measureMapMaxLineWidthPx(this, mapTextStyle, STAGE3_STR);
+  const targetHeightPx = measureMapBlockHeightPx(this, mapTextStyle, STAGE3_STR);
+  const anchorXPx = rectPx.x + Math.max(0, Math.floor((rectPx.width - targetWidthPx) / 2));
+  const anchorYPx = rectPx.y + Math.max(0, Math.floor((rectPx.height - targetHeightPx) / 2));
+  const mapOriginXPx = Math.round(anchorXPx);
+  const mapOriginYPx = Math.round(anchorYPx);
+
+  const mapLeftPx = mapOriginXPx;
+  const mapTopPx = mapOriginYPx;
+  const mapRightPx = mapLeftPx + mapWidthPx;
+  const mapBottomPx = mapTopPx + mapHeightPx;
 
   const fitsInRect = (
-    offsetX + mapWidthInCells <= rect.x + rect.width
-    && offsetY + mapHeightInCells <= rect.y + rect.height
-  );
-  const fitsInParent = (
-    offsetX + mapWidthInCells <= parentWidthInCells
-    && offsetY + mapHeightInCells <= parentHeightInCells
+    mapLeftPx >= rectPx.x
+    && mapRightPx <= rectPx.x + rectPx.width
+    && mapTopPx >= rectPx.y
+    && mapBottomPx <= rectPx.y + rectPx.height
   );
 
   // Canvas too small to draw image
-  if (!fitsInRect && !fitsInParent) return;
+  if (!fitsInRect) return;
 
   const rootUi = this.ui;
   const mapContainer = this.add.container(0, 0);
   rootUi.add(mapContainer);
-  const maskGraphics = this.add.graphics();
-  maskGraphics.fillStyle(0xffffff, 1);
-  maskGraphics.fillRect(clipRectPx.x, clipRectPx.y, clipRectPx.width, clipRectPx.height);
-  maskGraphics.setVisible(false);
-  rootUi.add(maskGraphics);
-  mapContainer.setMask(maskGraphics.createGeometryMask());
   this.ui = mapContainer;
 
-  this.buffer = Array.from({ length: parentHeightInCells }, () => Array(parentWidthInCells).fill(" "));
+  this.buffer = Array.from({ length: mapHeightInCells }, () => Array(mapWidthInCells).fill(" "));
 
   const batteries = {};
   const switches = {};
@@ -888,8 +904,8 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
   // this.parsedStaticMap.junctions.forEach((entry) => markAnchor(entry));
 
   this.mapBounds = {
-    x: offsetX,
-    y: offsetY,
+    x: 0,
+    y: 0,
     width: mapWidthInCells,
     height: mapHeightInCells,
   };
@@ -897,7 +913,7 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
   for (let row = 0; row < mapHeightInCells; ++row) {
     for (let col = 0; col < mapWidthInCells; ++col) {
       const c = STATIC_MAP_ARR[row][col];
-      this.buffer[row + offsetY][col + offsetX] = c;
+      this.buffer[row][col] = c;
     }
   }
 
@@ -916,8 +932,8 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
   //   this.buffer[row][0] = String(row % 10);
   // }
 
-  const baseX = Math.round(resolvedParentRectPx.x);
-  const baseY = Math.round(resolvedParentRectPx.y);
+  const baseX = mapOriginXPx;
+  const baseY = mapOriginYPx;
   const junctionChar = this.junctionDirection === "down" ? "┌" : "└";
   const arrowChar = this.switchDirection === "left" ? "<" : ">";
 
@@ -937,8 +953,8 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
     STATIC_MAP_ARR,
     this.parsedStaticMap,
     this.lockedUtilities,
-    offsetX,
-    offsetY
+    0,
+    0
   );
   const baseLayer = this.buffer.map((row) => row.map((ch) => {
     if (isArrowChar(ch)) return " ";
@@ -965,29 +981,13 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
     });
   };
 
-  const drawLayerByRow = (rows, style) => {
-    if (!rows || rows.length === 0) return;
-    const { lineSpacing, ...textStyle } = style || {};
-    const mergedStyle = { ...mapTextStyle, ...textStyle };
-    for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
-      const rowText = rows[rowIndex];
-      if (!rowText || !rowText.trim()) continue;
-      draw.bind(this)(rowText, {
-        offsetXPx: baseX,
-        offsetYPx: baseY + rowIndex * cellHeightPx,
-        textStyle: mergedStyle,
-        lineSpacing,
-      });
-    }
-  };
-
   drawLayer(baseLayer, { color: MAP_COLORS.default });
-  drawLayerByRow(
-    toLayerRows(isJunctionChar).map((row) => row.replace(/[\\/]/g, junctionChar)),
+  drawLayer(
+    toLayerRows(isJunctionChar).map((row) => row.replace(/[\\/]/g, junctionChar)).join("\n"),
     { color: MAP_COLORS.junction, stroke: MAP_COLORS.junction, strokeThickness: 1 }
   );
-  drawLayerByRow(
-    toLayerRows(isArrowChar).map((row) => row.replace(/[<>]/g, arrowChar)),
+  drawLayer(
+    toLayerRows(isArrowChar).map((row) => row.replace(/[<>]/g, arrowChar)).join("\n"),
     { color: MAP_COLORS.arrow, stroke: MAP_COLORS.arrow, strokeThickness: 1 }
   );
   const lockedUtilityLayer = buildLockedUtilityLayer(this.buffer, lockedUtilityMask);

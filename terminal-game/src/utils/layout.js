@@ -5,15 +5,32 @@ import {
   makeTextStyle,
 } from "../config/constants";
 
-function measureCellSizePx(probeText, fontSizePx) {
+function measureCellSizePx(fontSizePx) {
   const samples = 200;
-  const probeChar = "M";
-  probeText.setStyle(makeTextStyle(fontSizePx));
-  probeText.setText(probeChar.repeat(samples));
-  const cellW = probeText.width / samples;
-  probeText.setText(probeChar + "\n" + probeChar);
-  const cellH = probeText.height / 2;
-  return { cellW, cellH };
+  const probeChars = ["M", "▓", "░", "┌", "┐", "└", "┘", "─", "│", ">", "<", "/", "\\"];
+  const style = makeTextStyle(fontSizePx);
+  const fontFamily = style.fontFamily || "monospace";
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return { cellW: Math.max(1, fontSizePx * 0.6), cellH: Math.max(1, fontSizePx) };
+  }
+
+  ctx.font = `${fontSizePx}px ${fontFamily}`;
+
+  let cellW = 0;
+  for (const probeChar of probeChars) {
+    const metrics = ctx.measureText(probeChar.repeat(samples));
+    cellW = Math.max(cellW, metrics.width / samples);
+  }
+
+  const mMetrics = ctx.measureText("M");
+  const ascent = mMetrics.actualBoundingBoxAscent || fontSizePx * 0.8;
+  const descent = mMetrics.actualBoundingBoxDescent || fontSizePx * 0.2;
+  const cellH = Math.max(1, ascent + descent);
+
+  return { cellW: Math.max(1, cellW), cellH };
 }
 
 /**
@@ -61,15 +78,9 @@ export function computeLayout(scene, config = {}) {
     height: Math.max(0, rawFitRect.height - marginsV),
   };
 
-  if (!scene._layoutProbeText) {
-    scene._layoutProbeText = scene.add.text(0, 0, "", makeTextStyle(1)).setVisible(false);
-    scene._layoutProbeText.setResolution(1);
-  }
-  const probeText = scene._layoutProbeText;
-
   // Step 1: Find optimal cell size for the minimum diagram grid
   const baseFontSizePx = 100;
-  const baseMetrics = measureCellSizePx(probeText, baseFontSizePx);
+  const baseMetrics = measureCellSizePx(baseFontSizePx);
   const cellWPerPx = baseMetrics.cellW / baseFontSizePx;
   const cellHPerPx = baseMetrics.cellH / baseFontSizePx;
 
@@ -88,14 +99,14 @@ export function computeLayout(scene, config = {}) {
   }
 
   // Binary search refinement: find the largest fontSizePx that fits
-  let metrics = measureCellSizePx(probeText, fontSizePx);
+  let metrics = measureCellSizePx(fontSizePx);
   while (fontSizePx > 1 && (metrics.cellW > targetCellWPx || metrics.cellH > targetCellHPx)) {
     fontSizePx -= 1;
-    metrics = measureCellSizePx(probeText, fontSizePx);
+    metrics = measureCellSizePx(fontSizePx);
   }
   while (true) {
     const nextFontSize = fontSizePx + 1;
-    const nextMetrics = measureCellSizePx(probeText, nextFontSize);
+    const nextMetrics = measureCellSizePx(nextFontSize);
     if (nextMetrics.cellW > targetCellWPx || nextMetrics.cellH > targetCellHPx) {
       break;
     }

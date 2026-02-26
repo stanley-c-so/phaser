@@ -32,7 +32,7 @@ export const COLORS = {
 };
 
 export const TEXT_STYLE_BASE = {
-  fontFamily: "Cascadia Mono, Cascadia Code, Consolas, 'DejaVu Sans Mono', monospace",
+  fontFamily: "Consolas, 'Lucida Console', 'Courier New', 'Cascadia Mono', 'Cascadia Code', 'DejaVu Sans Mono', monospace",
   color: COLORS.TEXT,
 };
 

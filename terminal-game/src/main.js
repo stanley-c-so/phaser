@@ -46,8 +46,20 @@ window.addEventListener("keydown", (e) => {
   // window.location.href = "about:blank"
 }, { capture: true });
 
-try {
-  game.scene.start("StaticMap");
-} catch(e) {
-  console.error(e);
+async function startStaticMapWhenFontsReady() {
+  try {
+    if (document.fonts?.ready) {
+      await document.fonts.ready;
+    }
+  } catch (e) {
+    console.error(e);
+  }
+
+  try {
+    game.scene.start("StaticMap");
+  } catch (e) {
+    console.error(e);
+  }
 }
+
+startStaticMapWhenFontsReady();
