@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 
-import { STATIC_MAP_ASCII } from "../data/static-map";
+import { MAP_CONNECTIONS, STATIC_MAP_ASCII } from "../data/static-map";
 
 import { makeTextStyle } from "../config/constants";
 
@@ -32,6 +32,9 @@ const MAP_COLORS = {
   junction: "#FFFF00",
   battery: "#CCCC00",
 };
+
+const FILLED_CHAR = "▓";
+const EMPTY_CHAR = "░";
 
 const CONTROLS_LINES = [
   {
@@ -131,6 +134,7 @@ const CONTROLS_LINES = [
   {
     tokens: [{ text: "[ ENGAGE TRANSFER ]", color: CONTROLS_COLORS.action_primary }],
     selectable: true,
+    action: "engage_transfer",
   },
 ];
 
@@ -242,6 +246,131 @@ function isLabelChar(ch) {
   return (ch >= "0" && ch <= "9") || (ch >= "a" && ch <= "z") || (ch >= "A" && ch <= "Z");
 }
 
+function ensurePowerState(scene, parsedStaticMap) {
+  if (!scene.powerState) {
+    scene.powerState = { batteries: {}, utilities: {} };
+  }
+  for (const [id, battery] of Object.entries(parsedStaticMap.batteries || {})) {
+    if (!scene.powerState.batteries[id]) {
+      scene.powerState.batteries[id] = {
+        level: battery.level,
+        capacity: battery.capacity,
+      };
+    }
+  }
+  for (const [id, utility] of Object.entries(parsedStaticMap.utilities || {})) {
+    if (!scene.powerState.utilities[id]) {
+      scene.powerState.utilities[id] = {
+        level: utility.level,
+        capacity: utility.capacity,
+      };
+    }
+  }
+}
+
+function getUtilityUnitPositions(mapArr, anchor) {
+  const row = anchor.row;
+  const startCol = anchor.col + 1;
+  const width = mapArr[row]?.length || 0;
+  let idx = startCol;
+  while (idx < width && mapArr[row][idx] === " ") idx += 1;
+  const positions = [];
+  while (idx + 2 < width) {
+    const cell = mapArr[row][idx];
+    if (cell !== FILLED_CHAR && cell !== EMPTY_CHAR) break;
+    positions.push(idx);
+    idx += 3;
+    if (mapArr[row][idx] === " ") idx += 1;
+  }
+  return positions;
+}
+
+function applyPowerStateToMap(mapArr, parsedStaticMap, powerState) {
+  for (const [id, battery] of Object.entries(parsedStaticMap.batteries || {})) {
+    const state = powerState.batteries?.[id];
+    if (!state) continue;
+    const capacity = Math.max(0, state.capacity ?? battery.capacity ?? 0);
+    const level = Math.max(0, Math.min(state.level ?? 0, capacity));
+    for (let r = 0; r < capacity; r += 1) {
+      const row = battery.anchor.row + r;
+      const isFilledRow = r >= capacity - level;
+      for (let c = 0; c < 3; c += 1) {
+        const col = battery.anchor.col + c;
+        if (!mapArr[row] || mapArr[row][col] === undefined) continue;
+        mapArr[row][col] = isFilledRow ? FILLED_CHAR : EMPTY_CHAR;
+      }
+    }
+  }
+
+  for (const [id, utility] of Object.entries(parsedStaticMap.utilities || {})) {
+    const state = powerState.utilities?.[id];
+    if (!state) continue;
+    const positions = getUtilityUnitPositions(mapArr, utility.anchor);
+    const capacity = Math.max(0, Math.min(state.capacity ?? positions.length, positions.length));
+    const level = Math.max(0, Math.min(state.level ?? 0, capacity));
+    for (let i = 0; i < capacity; i += 1) {
+      const colStart = positions[i];
+      if (colStart === undefined) continue;
+      const isFilled = i < level;
+      for (let c = 0; c < 3; c += 1) {
+        const col = colStart + c;
+        if (mapArr[utility.anchor.row][col] === undefined) continue;
+        mapArr[utility.anchor.row][col] = isFilled ? FILLED_CHAR : EMPTY_CHAR;
+      }
+    }
+  }
+}
+
+function getSwitchForUtility(utilityId) {
+  for (const [switchId, utilities] of Object.entries(MAP_CONNECTIONS.switchToUtility || {})) {
+    if (utilities.includes(utilityId)) {
+      return switchId;
+    }
+  }
+  return null;
+}
+
+function getBatteryForSwitch(switchId, junctionDirection) {
+  const junctionState = junctionDirection === "down" ? "down" : "up";
+  const batteryMap = MAP_CONNECTIONS.batteryToSwitch?.[junctionState] || {};
+  for (const [batteryId, switches] of Object.entries(batteryMap)) {
+    if (switches.includes(switchId)) {
+      return batteryId;
+    }
+  }
+  return null;
+}
+
+function handleEngageTransfer() {
+  const activeUtilityId = this.activeUtilityId;
+  if (!activeUtilityId) return;
+  if (!this.parsedStaticMap) return;
+
+  ensurePowerState(this, this.parsedStaticMap);
+
+  const switchId = getSwitchForUtility(activeUtilityId);
+  if (!switchId) return;
+
+  const batteryId = getBatteryForSwitch(switchId, this.junctionDirection);
+  if (!batteryId) return;
+
+  const utilityState = this.powerState.utilities?.[activeUtilityId];
+  const batteryState = this.powerState.batteries?.[batteryId];
+  if (!utilityState || !batteryState) return;
+
+  const flowFromUtility = this.switchDirection === "left";
+  const fromState = flowFromUtility ? utilityState : batteryState;
+  const toState = flowFromUtility ? batteryState : utilityState;
+  const available = Math.max(0, fromState.level ?? 0);
+  const remaining = Math.max(0, (toState.capacity ?? 0) - (toState.level ?? 0));
+  const transferAmount = Math.min(available, remaining);
+  if (transferAmount <= 0) return;
+
+  fromState.level -= transferAmount;
+  toState.level += transferAmount;
+  this.render();
+}
+
 
 function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
   const cellWidthPx = this.registry.get("cellWidthPx") || 1;
@@ -283,8 +412,6 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
 
   this.buffer = Array.from({ length: parentHeightInCells }, () => Array(parentWidthInCells).fill(" "));
 
-  const FILLED_CHAR = "▓";
-  const EMPTY_CHAR = "░";
   const batteries = {};
   const switches = {};
   const utilities = {};
@@ -359,6 +486,8 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
   }
 
   this.parsedStaticMap = { batteries, switches, utilities, junctions };
+  ensurePowerState(this, this.parsedStaticMap);
+  applyPowerStateToMap(STATIC_MAP_ARR, this.parsedStaticMap, this.powerState);
   // console.log("YOOOO", this.parsedStaticMap)
 
   // // ANCHORS DIAGNOSTIC
@@ -558,6 +687,10 @@ export default class StaticMap extends Phaser.Scene {
       if (activeLine?.action === "toggle_switches") {
         this.switchDirection = this.switchDirection === "right" ? "left" : "right";
         this.render();
+        return;
+      }
+      if (activeLine?.action === "engage_transfer") {
+        handleEngageTransfer.bind(this)();
       }
     });
     this.input.keyboard.on("keydown-Q", () => {
