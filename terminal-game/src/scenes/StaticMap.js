@@ -31,6 +31,8 @@ const CONTROLS_COLORS = {
   action_secondary: "#FFFF00",
   active_utility: "#6BFF9C",
   debug: "#999999",
+  status_ok: "#6BFF9C",
+  status_error: "#FF5555",
 };
 
 const MAP_COLORS = {
@@ -84,8 +86,63 @@ function getStageHeaderLine(stage) {
   }
 }
 
-function buildControlsLines(stage, hasJunctions, lockedUtilities) {
+function getInitiateTransferTokens(transferContext) {
+  const {
+    activeUtilityId,
+    switchDirection,
+    junctionDirection,
+    mapConnections,
+  } = transferContext || {};
+
+  if (!activeUtilityId || !mapConnections) {
+    return [{ text: "[ INITIATE TRANSFER ]", color: CONTROLS_COLORS.action_primary }];
+  }
+
+  const switchId = getSwitchForUtility(activeUtilityId, mapConnections);
+  const batteryId = getBatteryForSwitch(switchId, junctionDirection, mapConnections);
+  if (!switchId || !batteryId) {
+    return [{ text: "[ INITIATE TRANSFER ]", color: CONTROLS_COLORS.action_primary }];
+  }
+
+  const flowFromUtility = switchDirection === "left";
+  const fromLabel = flowFromUtility ? activeUtilityId : `BATTERY ${batteryId}`;
+  const toLabel = flowFromUtility ? `BATTERY ${batteryId}` : activeUtilityId;
+  const fromColor = flowFromUtility ? CONTROLS_COLORS.entity : MAP_COLORS.battery;
+  const toColor = flowFromUtility ? MAP_COLORS.battery : CONTROLS_COLORS.entity;
+
+  return [
+    { text: "[ INITIATE TRANSFER FROM ", color: CONTROLS_COLORS.action_primary },
+    { text: fromLabel, color: fromColor },
+    { text: " TO ", color: CONTROLS_COLORS.action_primary },
+    { text: toLabel, color: toColor },
+    { text: " ]", color: CONTROLS_COLORS.action_primary },
+  ];
+}
+
+function getAvailableUtilities(mapConnections) {
+  const utilities = new Set();
+  const entries = Object.values(mapConnections?.switchToUtility || {});
+  for (const list of entries) {
+    for (const utilityId of list) {
+      utilities.add(utilityId);
+    }
+  }
+  return utilities;
+}
+
+function getTransferStatusTokens(transferStatus) {
+  if (!transferStatus?.message) {
+    return [];
+  }
+  const color = transferStatus.type === "error"
+    ? CONTROLS_COLORS.status_error
+    : CONTROLS_COLORS.status_ok;
+  return [{ text: transferStatus.message, color }];
+}
+
+function buildControlsLines(stage, hasJunctions, lockedUtilities, transferContext) {
   const isLocked = (id) => lockedUtilities?.has?.(id);
+  const availableUtilities = getAvailableUtilities(transferContext?.mapConnections);
   const lines = [
     {
       tokens: [{ text: "GOAL:", color: CONTROLS_COLORS.header }],
@@ -100,117 +157,131 @@ function buildControlsLines(stage, hasJunctions, lockedUtilities) {
       tokens: [{ text: "Select active utility and transfer direction:", color: CONTROLS_COLORS.header }],
       selectable: false,
     },
-    { tokens: [], selectable: false },
+  ];
+
+  lines.push(
     {
-      tokens: [
+      tokens: availableUtilities.has("A") ? [
         { text: "( ) ", color: CONTROLS_COLORS.bracket },
         { text: "A  ", color: CONTROLS_COLORS.entity },
         { text: "Primary Containment Seal", color: CONTROLS_COLORS.label },
-      ],
-      selectable: !isLocked("A"),
+      ] : [{ text: "", color: CONTROLS_COLORS.bracket }],
+      selectable: availableUtilities.has("A") && !isLocked("A"),
       utilityId: "A",
     },
     {
-      tokens: [
+      tokens: availableUtilities.has("B") ? [
         { text: "( ) ", color: CONTROLS_COLORS.bracket },
         { text: "B  ", color: CONTROLS_COLORS.entity },
         { text: "Environmental Comfort Controls", color: CONTROLS_COLORS.label },
-      ],
-      selectable: !isLocked("B"),
+      ] : [{ text: "", color: CONTROLS_COLORS.bracket }],
+      selectable: availableUtilities.has("B") && !isLocked("B"),
       utilityId: "B",
     },
     {
-      tokens: [
+      tokens: availableUtilities.has("C") ? [
         { text: "( ) ", color: CONTROLS_COLORS.bracket },
         { text: "C  ", color: CONTROLS_COLORS.entity },
         { text: "Administrative Data Archive", color: CONTROLS_COLORS.label },
-      ],
-      selectable: !isLocked("C"),
+      ] : [{ text: "", color: CONTROLS_COLORS.bracket }],
+      selectable: availableUtilities.has("C") && !isLocked("C"),
       utilityId: "C",
     },
     {
-      tokens: [
+      tokens: availableUtilities.has("D") ? [
         { text: "( ) ", color: CONTROLS_COLORS.bracket },
         { text: "D  ", color: CONTROLS_COLORS.entity },
         { text: "Staff Decontamination Shower", color: CONTROLS_COLORS.label },
-      ],
-      selectable: !isLocked("D"),
+      ] : [{ text: "", color: CONTROLS_COLORS.bracket }],
+      selectable: availableUtilities.has("D") && !isLocked("D"),
       utilityId: "D",
     },
     {
-      tokens: [
+      tokens: availableUtilities.has("E") ? [
         { text: "( ) ", color: CONTROLS_COLORS.bracket },
         { text: "E  ", color: CONTROLS_COLORS.entity },
         { text: "Inter-wing Power Relay", color: CONTROLS_COLORS.label },
-      ],
-      selectable: !isLocked("E"),
+      ] : [{ text: "", color: CONTROLS_COLORS.bracket }],
+      selectable: availableUtilities.has("E") && !isLocked("E"),
       utilityId: "E",
     },
     {
-      tokens: [
+      tokens: availableUtilities.has("F") ? [
         { text: "( ) ", color: CONTROLS_COLORS.bracket },
         { text: "F  ", color: CONTROLS_COLORS.entity },
         { text: "Genomic Analysis Array", color: CONTROLS_COLORS.label },
-      ],
-      selectable: !isLocked("F"),
+      ] : [{ text: "", color: CONTROLS_COLORS.bracket }],
+      selectable: availableUtilities.has("F") && !isLocked("F"),
       utilityId: "F",
     },
     {
-      tokens: [
+      tokens: availableUtilities.has("G") ? [
         { text: "( ) ", color: CONTROLS_COLORS.bracket },
         { text: "G  ", color: CONTROLS_COLORS.entity },
         { text: "Cryogenic Thermal Mass Stabilizer", color: CONTROLS_COLORS.label },
-      ],
-      selectable: !isLocked("G"),
+      ] : [{ text: "", color: CONTROLS_COLORS.bracket }],
+      selectable: availableUtilities.has("G") && !isLocked("G"),
       utilityId: "G",
     },
     {
-      tokens: [
+      tokens: availableUtilities.has("H") ? [
         { text: "( ) ", color: CONTROLS_COLORS.bracket },
         { text: "H  ", color: CONTROLS_COLORS.entity },
         { text: "Antiviral Synthesis Reactor", color: CONTROLS_COLORS.label },
-      ],
-      selectable: !isLocked("H"),
+      ] : [{ text: "", color: CONTROLS_COLORS.bracket }],
+      selectable: availableUtilities.has("H") && !isLocked("H"),
       utilityId: "H",
     },
+  );
+
+  // Toggle all switches
+  lines.push(
     { tokens: [], selectable: false },
     {
       tokens: [
-        { text: "[ Toggle all switches ]", color: CONTROLS_COLORS.action_secondary },
+        { text: "[ Change switch directions ]", color: CONTROLS_COLORS.action_secondary },
       ],
       selectable: true,
       action: "toggle_switches",
     },
-  ];
+  );
 
-  if (hasJunctions) {
-    lines.push(
-      { tokens: [], selectable: false },
-      {
-        tokens: [
-          { text: "[ Toggle all junctions ]", color: CONTROLS_COLORS.action_secondary },
-        ],
-        selectable: true,
-        action: "toggle_junctions",
-      }
-    );
-  }
-
+  // Toggle junctions
   lines.push(
     { tokens: [], selectable: false },
     {
-      tokens: [{ text: "[ ENGAGE TRANSFER ]", color: CONTROLS_COLORS.action_primary }],
-      selectable: true,
-      action: "engage_transfer",
-    },
-
-    // { tokens: [], selectable: false },
-    // {
-    //   tokens: [{ text: "[ DEBUG: NEXT STAGE ]", color: CONTROLS_COLORS.debug }],
-    //   selectable: true,
-    //   action: "next_stage",
-    // }
+      tokens: hasJunctions ? [
+        { text: "[ Change all junctions ]", color: CONTROLS_COLORS.action_secondary },
+      ] : [{ text: "", color: CONTROLS_COLORS.action_secondary }],
+      selectable: hasJunctions,
+      action: "toggle_junctions",
+    }
   );
+
+  // Transfer action and status
+  lines.push(
+    { tokens: [], selectable: false },
+    {
+      tokens: getInitiateTransferTokens(transferContext),
+      selectable: true,
+      action: "initiate_transfer",
+    },
+    { tokens: [], selectable: false },
+    {
+      tokens: getTransferStatusTokens(transferContext?.transferStatus),
+      selectable: false,
+    },
+  );
+
+  // Debug action
+  // lines.push(
+  //   { tokens: [], selectable: false },
+  //   {
+  //     tokens: [{ text: "[ DEBUG: NEXT STAGE ]", color: CONTROLS_COLORS.debug }],
+  //     selectable: true,
+  //     action: "next_stage",
+  //   }
+  // );
 
   return lines;
 }
@@ -252,6 +323,18 @@ function getMapMeasureText(scene, textStyle) {
     scene._mapMeasureText.setResolution(1);
   }
   return scene._mapMeasureText;
+}
+
+function measureMapMaxLineWidthPx(scene, textStyle, lines) {
+  const measureText = getMapMeasureText(scene, textStyle);
+  measureText.setStyle(textStyle);
+  measureText.setLineSpacing(0);
+  let maxWidth = 0;
+  for (const line of lines) {
+    measureText.setText(line);
+    maxWidth = Math.max(maxWidth, measureText.width);
+  }
+  return Math.ceil(maxWidth);
 }
 
 function measureTokenLineWidth(scene, controlsStyle, tokens) {
@@ -443,8 +526,9 @@ function buildLockedUtilityLayer(buffer, lockedUtilityMask) {
   )).join("")).join("\n");
 }
 
-function getSwitchForUtility(utilityId) {
-  for (const [switchId, utilities] of Object.entries(MAP_CONNECTIONS_3.switchToUtility || {})) {
+function getSwitchForUtility(utilityId, mapConnections) {
+  const connections = mapConnections || MAP_CONNECTIONS_3;
+  for (const [switchId, utilities] of Object.entries(connections.switchToUtility || {})) {
     if (utilities.includes(utilityId)) {
       return switchId;
     }
@@ -452,9 +536,10 @@ function getSwitchForUtility(utilityId) {
   return null;
 }
 
-function getBatteryForSwitch(switchId, junctionDirection) {
+function getBatteryForSwitch(switchId, junctionDirection, mapConnections) {
   const junctionState = junctionDirection === "down" ? "down" : "up";
-  const batteryMap = this.currentMapConnections.batteryToSwitch?.[junctionState] || {};
+  const connections = mapConnections || MAP_CONNECTIONS_3;
+  const batteryMap = connections.batteryToSwitch?.[junctionState] || {};
   for (const [batteryId, switches] of Object.entries(batteryMap)) {
     if (switches.includes(switchId)) {
       return batteryId;
@@ -470,10 +555,10 @@ function handleEngageTransfer() {
 
   ensurePowerState(this, this.parsedStaticMap);
 
-  const switchId = getSwitchForUtility(activeUtilityId);
+  const switchId = getSwitchForUtility(activeUtilityId, this.currentMapConnections);
   if (!switchId) return;
 
-  const batteryId = getBatteryForSwitch.bind(this)(switchId, this.junctionDirection);
+  const batteryId = getBatteryForSwitch(switchId, this.junctionDirection, this.currentMapConnections);
   if (!batteryId) return;
 
   const utilityState = this.powerState.utilities?.[activeUtilityId];
@@ -483,13 +568,29 @@ function handleEngageTransfer() {
   const flowFromUtility = this.switchDirection === "left";
   const fromState = flowFromUtility ? utilityState : batteryState;
   const toState = flowFromUtility ? batteryState : utilityState;
+  const fromLabel = flowFromUtility ? activeUtilityId : `battery ${batteryId}`;
+  const toLabel = flowFromUtility ? `battery ${batteryId}` : activeUtilityId;
   const available = Math.max(0, fromState.level ?? 0);
   const remaining = Math.max(0, (toState.capacity ?? 0) - (toState.level ?? 0));
   const transferAmount = Math.min(available, remaining);
-  if (transferAmount <= 0) return;
+  if (transferAmount <= 0) {
+    if (available <= 0) {
+      this.transferStatus = { message: `ERROR: no power in ${fromLabel}`, type: "error" };
+    } else if (remaining <= 0) {
+      this.transferStatus = { message: `ERROR: ${toLabel} is full`, type: "error" };
+    } else {
+      this.transferStatus = { message: "ERROR: transfer blocked", type: "error" };
+    }
+    this.render();
+    return;
+  }
 
   fromState.level -= transferAmount;
   toState.level += transferAmount;
+  this.transferStatus = {
+    message: `Transferred ${transferAmount} unit${transferAmount === 1 ? "" : "s"} from ${fromLabel} to ${toLabel}`,
+    type: "ok",
+  };
   const didAdvance = checkStageGoals.bind(this)();
   if (!didAdvance) {
     this.render();
@@ -520,7 +621,13 @@ function checkStageGoals() {
   this.completedStages.add(this.stage);
 
   if (this.activeUtilityId === goal.utilityId) {
-    const controlsLines = buildControlsLines(this.stage, this.hasJunctions, this.lockedUtilities);
+    const controlsLines = buildControlsLines(this.stage, this.hasJunctions, this.lockedUtilities, {
+      activeUtilityId: this.activeUtilityId,
+      switchDirection: this.switchDirection,
+      junctionDirection: this.junctionDirection,
+      mapConnections: this.currentMapConnections,
+      transferStatus: this.transferStatus,
+    });
     const nextUtilityLine = controlsLines.find((line) => line?.utilityId && line.selectable);
     this.activeUtilityId = nextUtilityLine?.utilityId || null;
   }
@@ -546,6 +653,7 @@ function handleNextStage() {
     this.currentMapConnections = MAP_CONNECTIONS_3;
     this.activeUtilityId = "G";
   }
+  // this.transferStatus = { message: "", type: "ok" };
   this.render();
 }
 
@@ -579,6 +687,9 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
   const STATIC_MAP_ARR = STATIC_MAP_STR.map(line => line.padEnd(maxLineLength, " ").split(""));
   const mapWidthInCells = STATIC_MAP_ARR[0].length;
   const mapHeightInCells = STATIC_MAP_ARR.length;
+  const mapTextStyle = this.registry.get("textStyle") || makeTextStyle(1);
+  const mapWidthPx = measureMapMaxLineWidthPx(this, mapTextStyle, STATIC_MAP_STR);
+  const mapHeightPx = Math.ceil(mapHeightInCells * cellHeightPx);
   
   const rectX0 = Math.round(parentWidthInCells * rectPct.x0 / 100);
   const rectX1 = Math.round(parentWidthInCells * rectPct.x1 / 100);
@@ -589,6 +700,12 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
     y: rectY0,
     width: Math.max(0, rectX1 - rectX0),
     height: Math.max(0, rectY1 - rectY0),
+  };
+  const clipRectPx = {
+    x: rectPx.x,
+    y: rectPx.y,
+    width: Math.max(rectPx.width, resolvedParentRectPx.width - rectPx.x),
+    height: Math.min(resolvedParentRectPx.height, Math.max(rectPx.height, mapHeightPx)),
   };
   const stage3Dims = getMapDimensions(STATIC_MAP_ASCII_3);
   const anchorX = rect.x + Math.max(0, Math.floor((rect.width - stage3Dims.width) / 2));
@@ -613,7 +730,7 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
   rootUi.add(mapContainer);
   const maskGraphics = this.add.graphics();
   maskGraphics.fillStyle(0xffffff, 1);
-  maskGraphics.fillRect(rectPx.x, rectPx.y, rectPx.width, rectPx.height);
+  maskGraphics.fillRect(clipRectPx.x, clipRectPx.y, clipRectPx.width, clipRectPx.height);
   maskGraphics.setVisible(false);
   rootUi.add(maskGraphics);
   mapContainer.setMask(maskGraphics.createGeometryMask());
@@ -743,8 +860,6 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
 
   const baseX = Math.round(resolvedParentRectPx.x);
   const baseY = Math.round(resolvedParentRectPx.y);
-  const mapTextStyle = this.registry.get("textStyle") || makeTextStyle(1);
-
   const junctionChar = this.junctionDirection === "down" ? "┌" : "└";
   const arrowChar = this.switchDirection === "left" ? "<" : ">";
 
@@ -837,7 +952,13 @@ function drawControlsUI({ parentRectPx, rectPct = CONTROLS_RECT_PCT } = {}) {
     height: Math.round(fallbackHeight * cellHeightPx),
   };
   const baseFontSizePx = this.registry.get("fontSizePx") || 1;
-  const controlsLines = this.controlsLines || buildControlsLines(this.stage, this.hasJunctions, this.lockedUtilities);
+  const controlsLines = this.controlsLines || buildControlsLines(this.stage, this.hasJunctions, this.lockedUtilities, {
+    activeUtilityId: this.activeUtilityId,
+    switchDirection: this.switchDirection,
+    junctionDirection: this.junctionDirection,
+    mapConnections: this.currentMapConnections,
+    transferStatus: this.transferStatus,
+  });
   const normalizedActiveIndex = normalizeSelectableIndex(controlsLines, this.controlsActiveIndex ?? 0);
   const activeUtilityId = this.activeUtilityId;
   const lockedUtilities = this.lockedUtilities || new Set();
@@ -873,6 +994,7 @@ function drawControlsUI({ parentRectPx, rectPct = CONTROLS_RECT_PCT } = {}) {
   const highlight = this.add.rectangle(baseX, highlightY, clampedHighlightWidth, highlightHeight, 0x003300).setOrigin(0, 0);
   this.ui.add(highlight);
 
+  const availableUtilities = getAvailableUtilities(this.currentMapConnections);
   for (let i = 0; i < controlsLines.length; i += 1) {
     const line = controlsLines[i];
     const lineY = Math.round(baseY + i * lineStepPx);
@@ -884,7 +1006,7 @@ function drawControlsUI({ parentRectPx, rectPct = CONTROLS_RECT_PCT } = {}) {
       let tokenColor = token.color || controlsStyle.color;
       let tokenTextValue = token.text;
       if (line.utilityId && tokenIndex === 0) {
-        tokenTextValue = line.utilityId === activeUtilityId ? "(x) " : "( ) ";
+        tokenTextValue = line.utilityId === activeUtilityId ? "(x) " : availableUtilities.has(line.utilityId) ? "( ) " : "";
       }
       if (isLockedUtility) {
         tokenColor = MAP_COLORS.utility_locked;
@@ -911,33 +1033,58 @@ export default class StaticMap extends Phaser.Scene {
 
   create() {
 
-    // console.log("SCALE", this.scale)
-
     updateRegistryFromScale(this);
+
+    // Initialize state
     this.stage = 1;
     this.currentMap = STATIC_MAP_ASCII_1;
     this.currentMapConnections = MAP_CONNECTIONS_1;
     this.switchDirection = "right";
     this.junctionDirection = "up";
     this.activeUtilityId = "A";
+    this.transferStatus = { message: "", type: "ok" };
     this.lockedUtilities = new Set();
     this.completedStages = new Set();
-    this.controlsLines = buildControlsLines(this.stage, false, this.lockedUtilities);
+    this.controlsLines = buildControlsLines(this.stage, false, this.lockedUtilities, {
+      activeUtilityId: this.activeUtilityId,
+      switchDirection: this.switchDirection,
+      junctionDirection: this.junctionDirection,
+      mapConnections: this.currentMapConnections,
+      transferStatus: this.transferStatus,
+    });
     this.controlsActiveIndex = normalizeSelectableIndex(this.controlsLines, 0);
+
+    // Set up input handlers
     this.input.keyboard.on("keydown-UP", () => {
-      const controlsLines = this.controlsLines || buildControlsLines(this.stage, this.hasJunctions, this.lockedUtilities);
+      const controlsLines = this.controlsLines || buildControlsLines(this.stage, this.hasJunctions, this.lockedUtilities, {
+        activeUtilityId: this.activeUtilityId,
+        switchDirection: this.switchDirection,
+        junctionDirection: this.junctionDirection,
+        mapConnections: this.currentMapConnections,
+        transferStatus: this.transferStatus,
+      });
       this.controlsActiveIndex = getNextSelectableIndex(controlsLines, this.controlsActiveIndex, -1);
       this.render();
-      // console.log("this.controlsActiveIndex", this.controlsActiveIndex);
     });
     this.input.keyboard.on("keydown-DOWN", () => {
-      const controlsLines = this.controlsLines || buildControlsLines(this.stage, this.hasJunctions, this.lockedUtilities);
+      const controlsLines = this.controlsLines || buildControlsLines(this.stage, this.hasJunctions, this.lockedUtilities, {
+        activeUtilityId: this.activeUtilityId,
+        switchDirection: this.switchDirection,
+        junctionDirection: this.junctionDirection,
+        mapConnections: this.currentMapConnections,
+        transferStatus: this.transferStatus,
+      });
       this.controlsActiveIndex = getNextSelectableIndex(controlsLines, this.controlsActiveIndex, 1);
       this.render();
-      // console.log("this.controlsActiveIndex", this.controlsActiveIndex);
     });
     this.input.keyboard.on("keydown-ENTER", () => {
-      const controlsLines = this.controlsLines || buildControlsLines(this.stage, this.hasJunctions, this.lockedUtilities);
+      const controlsLines = this.controlsLines || buildControlsLines(this.stage, this.hasJunctions, this.lockedUtilities, {
+        activeUtilityId: this.activeUtilityId,
+        switchDirection: this.switchDirection,
+        junctionDirection: this.junctionDirection,
+        mapConnections: this.currentMapConnections,
+        transferStatus: this.transferStatus,
+      });
       const normalizedIndex = normalizeSelectableIndex(controlsLines, this.controlsActiveIndex ?? 0);
       this.controlsActiveIndex = normalizedIndex;
       const activeLine = controlsLines[normalizedIndex];
@@ -956,7 +1103,7 @@ export default class StaticMap extends Phaser.Scene {
         this.render();
         return;
       }
-      if (activeLine?.action === "engage_transfer") {
+      if (activeLine?.action === "initiate_transfer") {
         handleEngageTransfer.bind(this)();
         return;
       }
@@ -972,6 +1119,7 @@ export default class StaticMap extends Phaser.Scene {
     });
     this.render();
 
+    // Re-render on resize
     this.scale.on("resize", () => {
       updateRegistryFromScale(this);
       this.render();
@@ -989,7 +1137,13 @@ export default class StaticMap extends Phaser.Scene {
       drawLayoutDebug(this, innerRectPx, MAP_RECT_PCT, CONTROLS_RECT_PCT);
     }
     drawMap.bind(this)({ parentRectPx: innerRectPx, rectPct: MAP_RECT_PCT });
-    this.controlsLines = buildControlsLines(this.stage, this.hasJunctions, this.lockedUtilities);
+    this.controlsLines = buildControlsLines(this.stage, this.hasJunctions, this.lockedUtilities, {
+      activeUtilityId: this.activeUtilityId,
+      switchDirection: this.switchDirection,
+      junctionDirection: this.junctionDirection,
+      mapConnections: this.currentMapConnections,
+      transferStatus: this.transferStatus,
+    });
     this.controlsActiveIndex = normalizeSelectableIndex(this.controlsLines, this.controlsActiveIndex ?? 0);
     drawControlsUI.bind(this)({ parentRectPx: innerRectPx, rectPct: CONTROLS_RECT_PCT });
   }
