@@ -2,7 +2,7 @@ import Phaser from "phaser";
 
 import { STATIC_MAP_ASCII } from "../data/static-map";
 
-import { makeTextStyle } from "../config/constants";
+import { COLORS, makeTextStyle } from "../config/constants";
 
 import {
   draw,
@@ -15,29 +15,116 @@ import { updateRegistryFromScale } from "../utils/registry";
 
 const MAP_RECT_PCT = { x0: 0, y0: 0, x1: 55, y1: 100 };
 const CONTROLS_RECT_PCT = { x0: 55, y0: 0, x1: 98, y1: 100 };
+const CONTROLS_COLORS = {
+  header: "#0FAE5A",
+  bracket: "#0B7A3A",
+  entity: "#6BFF9C",
+  label: "#0FAE5A",
+  action_primary: "#00FF55",
+  action_secondary: "#AAE36D",
+};
+
+const MAP_COLORS = {
+  default: "#559900",
+  label: "#6BFF9C",
+  arrow: "#3CFF6E",
+  junction: "#AAE36D",
+  battery: "#CCCC00",
+};
+
+const MAP_DRAW = {
+  showArrows: true,
+  showJunctions: true,
+  showLabels: true,
+  showBatteries: true,
+};
+
 const CONTROLS_LINES = [
-  "TOGGLE POWER ROUTER",
-  "",
-  "[ ] A  Primary Containment Seal",
-  "[ ] B  Environmental Comfort Controls",
-  "[ ] C  Administrative Data Archive",
-  "[ ] D  Staff Decontamination Shower",
-  "[ ] E  Inter-wing Power Relay",
-  "[ ] F  Genomic Analysis Array",
-  "[ ] G  Cryogenic Thermal Mass Stabilizer",
-  "[ ] H  Antiviral Synthesis Reactor",
-  "",
-  "> Toggle all junctions",
-  "",
-  "ENGAGE TRANSFER",
+  {
+    tokens: [{ text: "Select active utility and transfer direction:", color: CONTROLS_COLORS.header }],
+    selectable: false,
+  },
+  { tokens: [], selectable: false },
+  {
+    tokens: [
+      { text: "[ ] ", color: CONTROLS_COLORS.bracket },
+      { text: "A  ", color: CONTROLS_COLORS.entity },
+      { text: "Primary Containment Seal", color: CONTROLS_COLORS.label },
+    ],
+    selectable: true,
+  },
+  {
+    tokens: [
+      { text: "[ ] ", color: CONTROLS_COLORS.bracket },
+      { text: "B  ", color: CONTROLS_COLORS.entity },
+      { text: "Environmental Comfort Controls", color: CONTROLS_COLORS.label },
+    ],
+    selectable: true,
+  },
+  {
+    tokens: [
+      { text: "[ ] ", color: CONTROLS_COLORS.bracket },
+      { text: "C  ", color: CONTROLS_COLORS.entity },
+      { text: "Administrative Data Archive", color: CONTROLS_COLORS.label },
+    ],
+    selectable: true,
+  },
+  {
+    tokens: [
+      { text: "[ ] ", color: CONTROLS_COLORS.bracket },
+      { text: "D  ", color: CONTROLS_COLORS.entity },
+      { text: "Staff Decontamination Shower", color: CONTROLS_COLORS.label },
+    ],
+    selectable: true,
+  },
+  {
+    tokens: [
+      { text: "[ ] ", color: CONTROLS_COLORS.bracket },
+      { text: "E  ", color: CONTROLS_COLORS.entity },
+      { text: "Inter-wing Power Relay", color: CONTROLS_COLORS.label },
+    ],
+    selectable: true,
+  },
+  {
+    tokens: [
+      { text: "[ ] ", color: CONTROLS_COLORS.bracket },
+      { text: "F  ", color: CONTROLS_COLORS.entity },
+      { text: "Genomic Analysis Array", color: CONTROLS_COLORS.label },
+    ],
+    selectable: true,
+  },
+  {
+    tokens: [
+      { text: "[ ] ", color: CONTROLS_COLORS.bracket },
+      { text: "G  ", color: CONTROLS_COLORS.entity },
+      { text: "Cryogenic Thermal Mass Stabilizer", color: CONTROLS_COLORS.label },
+    ],
+    selectable: true,
+  },
+  {
+    tokens: [
+      { text: "[ ] ", color: CONTROLS_COLORS.bracket },
+      { text: "H  ", color: CONTROLS_COLORS.entity },
+      { text: "Antiviral Synthesis Reactor", color: CONTROLS_COLORS.label },
+    ],
+    selectable: true,
+  },
+  { tokens: [], selectable: false },
+  {
+    tokens: [
+      { text: "[ Toggle all junctions ]", color: CONTROLS_COLORS.action_secondary },
+    ],
+    selectable: true,
+  },
+  { tokens: [], selectable: false },
+  {
+    tokens: [{ text: "[ ENGAGE TRANSFER ]", color: CONTROLS_COLORS.action_primary }],
+    selectable: true,
+  },
 ];
 
-const NON_SELECTABLE_CONTROLS = new Set(["TOGGLE POWER ROUTER"]);
-
 function isSelectableControlLine(line) {
-  if (!line) return false;
-  if (!line.trim()) return false;
-  return !NON_SELECTABLE_CONTROLS.has(line.trim());
+  return Boolean(line?.selectable);
 }
 
 function getNextSelectableIndex(lines, startIndex, direction) {
@@ -59,32 +146,58 @@ function normalizeSelectableIndex(lines, index) {
   return getNextSelectableIndex(lines, index, 1);
 }
 
-function measureControlsLayout(scene, controlsStyle, lines, lineSpacingPx) {
+function getMeasureText(scene, controlsStyle) {
   if (!scene._controlsMeasureText) {
     scene._controlsMeasureText = scene.add.text(0, 0, "", controlsStyle).setVisible(false);
     scene._controlsMeasureText.setResolution(1);
   }
+  return scene._controlsMeasureText;
+}
 
+function getMapMeasureText(scene, textStyle) {
+  if (!scene._mapMeasureText) {
+    scene._mapMeasureText = scene.add.text(0, 0, "", textStyle).setVisible(false);
+    scene._mapMeasureText.setResolution(1);
+  }
+  return scene._mapMeasureText;
+}
+
+function measureTokenLineWidth(scene, controlsStyle, tokens) {
+  const measureText = getMeasureText(scene, controlsStyle);
+  measureText.setStyle(controlsStyle);
+  measureText.setLineSpacing(0);
+  let width = 0;
+  for (const token of tokens) {
+    measureText.setText(token.text);
+    width += Math.ceil(measureText.width);
+  }
+  return width;
+}
+
+function measureLineStepPx(scene, controlsStyle, lineSpacingPx) {
+  const measureText = getMeasureText(scene, controlsStyle);
+  measureText.setStyle(controlsStyle);
+  measureText.setLineSpacing(lineSpacingPx);
+  measureText.setText("M\nM");
+  return measureText.height / 2;
+}
+
+function measureControlsLayout(scene, controlsStyle, lines, lineSpacingPx) {
   const fontSize = controlsStyle.fontSize || "";
-  const cacheKey = `${fontSize}|${lineSpacingPx}|${lines.join("\n")}`;
+  const cacheKey = `${fontSize}|${lineSpacingPx}|${lines.length}`;
   if (scene._controlsMeasureCache?.key === cacheKey) {
     return scene._controlsMeasureCache.value;
   }
 
-  const measureText = scene._controlsMeasureText;
-  measureText.setStyle(controlsStyle);
-  measureText.setLineSpacing(lineSpacingPx);
-
-  const longestLine = lines.reduce((longest, line) => (line.length > longest.length ? line : longest), "");
-  measureText.setText(longestLine);
-  const highlightWidth = Math.ceil(measureText.width);
-
-  measureText.setText(lines.join("\n"));
-  const totalLines = Math.max(1, lines.length);
-  const lineStepPx = measureText.height / totalLines;
+  const lineStepPx = measureLineStepPx(scene, controlsStyle, lineSpacingPx);
+  let maxLineWidth = 0;
+  for (const line of lines) {
+    const width = measureTokenLineWidth(scene, controlsStyle, line.tokens || []);
+    maxLineWidth = Math.max(maxLineWidth, width);
+  }
   const highlightHeight = Math.max(1, Math.round(lineStepPx));
 
-  const value = { highlightWidth, lineStepPx, highlightHeight };
+  const value = { maxLineWidth, lineStepPx, highlightHeight };
   scene._controlsMeasureCache = { key: cacheKey, value };
   return value;
 }
@@ -100,6 +213,22 @@ function rectPctToPx(rectPct, parentRectPx) {
     width: Math.max(0, x1 - x0),
     height: Math.max(0, y1 - y0),
   };
+}
+
+function isArrowChar(ch) {
+  return ch === ">" || ch === "<";
+}
+
+function isJunctionChar(ch) {
+  return ch === "/" || ch === "\\";
+}
+
+function isBatteryChar(ch) {
+  return ch === "▓" || ch === "░";
+}
+
+function isLabelChar(ch) {
+  return (ch >= "0" && ch <= "9") || (ch >= "a" && ch <= "z") || (ch >= "A" && ch <= "Z");
 }
 
 
@@ -262,10 +391,45 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
   //   this.buffer[row][0] = String(row % 10);
   // }
 
-  draw.bind(this)(this.buffer.map(line => line.join("")).join("\n"), {
-    offsetXPx: resolvedParentRectPx.x,
-    offsetYPx: resolvedParentRectPx.y,
-  });
+  const baseX = Math.round(resolvedParentRectPx.x);
+  const baseY = Math.round(resolvedParentRectPx.y);
+  const mapTextStyle = this.registry.get("textStyle") || makeTextStyle(1);
+
+  const toLayer = (predicate, include) => {
+    const alternateChars = {
+      "/": "┌",
+      "\\": "└",
+    };
+    return this.buffer.map((row) => row.map(
+      (ch) => (include && predicate(ch)
+        ? (alternateChars[ch] || ch)
+        : " "
+      )
+    ).join("")).join("\n")
+  };
+
+  const baseLayer = this.buffer.map((row) => row.map((ch) => {
+    if (MAP_DRAW.showArrows && isArrowChar(ch)) return " ";
+    if (MAP_DRAW.showJunctions && isJunctionChar(ch)) return " ";
+    if (MAP_DRAW.showBatteries && isBatteryChar(ch)) return " ";
+    if (MAP_DRAW.showLabels && isLabelChar(ch)) return " ";
+    return ch;
+  }).join("")).join("\n");
+
+  const drawLayer = (content, style) => {
+    if (!content || !content.trim()) return;
+    draw.bind(this)(content, {
+      offsetXPx: baseX,
+      offsetYPx: baseY,
+      textStyle: { ...mapTextStyle, ...style },
+    });
+  };
+
+  drawLayer(baseLayer, { color: MAP_COLORS.default });
+  drawLayer(toLayer(isJunctionChar, MAP_DRAW.showJunctions), { color: MAP_COLORS.junction, fontStyle: "bold" });
+  drawLayer(toLayer(isArrowChar, MAP_DRAW.showArrows), { color: MAP_COLORS.arrow });
+  drawLayer(toLayer(isBatteryChar, MAP_DRAW.showBatteries), { color: MAP_COLORS.battery });
+  drawLayer(toLayer(isLabelChar, MAP_DRAW.showLabels), { color: MAP_COLORS.label });
 }
 
 function drawControlsUI({ parentRectPx, rectPct = CONTROLS_RECT_PCT } = {}) {
@@ -284,30 +448,13 @@ function drawControlsUI({ parentRectPx, rectPct = CONTROLS_RECT_PCT } = {}) {
 
   const rectPx = rectPctToPx(rectPct, resolvedParentRectPx);
 
-  const getMaxLineWidthPx = (sizePx, lineSpacingPx) => {
-    if (!this._controlsMeasureText) {
-      this._controlsMeasureText = this.add.text(0, 0, "", makeTextStyle(1)).setVisible(false);
-      this._controlsMeasureText.setResolution(1);
-    }
-    const measureText = this._controlsMeasureText;
-    measureText.setStyle(makeTextStyle(sizePx));
-    measureText.setLineSpacing(lineSpacingPx);
-    let maxWidth = 0;
-    for (const line of CONTROLS_LINES) {
-      measureText.setText(line);
-      maxWidth = Math.max(maxWidth, Math.ceil(measureText.width));
-    }
-    return maxWidth;
-  };
-
   const fitControlsFontSize = (startPx) => {
     let sizePx = Math.max(1, Math.floor(startPx));
     while (sizePx > 1) {
       const lineSpacingPx = Math.max(0, Math.floor(sizePx * 0.2));
-      const { lineStepPx } = measureControlsLayout(this, makeTextStyle(sizePx), CONTROLS_LINES, lineSpacingPx);
+      const { lineStepPx, maxLineWidth } = measureControlsLayout(this, makeTextStyle(sizePx), CONTROLS_LINES, lineSpacingPx);
       const totalHeightPx = Math.round(lineStepPx * CONTROLS_LINES.length);
-      const maxLineWidthPx = getMaxLineWidthPx(sizePx, lineSpacingPx);
-      if (maxLineWidthPx <= rectPx.width && totalHeightPx <= rectPx.height) {
+      if (maxLineWidth <= rectPx.width && totalHeightPx <= rectPx.height) {
         break;
       }
       sizePx -= 1;
@@ -318,24 +465,34 @@ function drawControlsUI({ parentRectPx, rectPct = CONTROLS_RECT_PCT } = {}) {
   const controlsFontSizePx = fitControlsFontSize(baseFontSizePx * 1.5);
   const controlsStyle = makeTextStyle(controlsFontSizePx);
   const lineSpacingPx = Math.max(0, Math.floor(controlsFontSizePx * 0.2));
-  const { highlightWidth, lineStepPx, highlightHeight } = measureControlsLayout(this, controlsStyle, CONTROLS_LINES, lineSpacingPx);
+  const { maxLineWidth, lineStepPx, highlightHeight } = measureControlsLayout(this, controlsStyle, CONTROLS_LINES, lineSpacingPx);
   const totalHeightPx = Math.round(lineStepPx * CONTROLS_LINES.length);
   const baseX = Math.round(rectPx.x);
   const centeredY = rectPx.y + Math.max(0, Math.floor((rectPx.height - totalHeightPx) / 2));
   const baseY = Math.round(centeredY);
   const highlightY = Math.round(baseY + normalizedActiveIndex * lineStepPx);
-  const clampedHighlightWidth = Math.min(highlightWidth, Math.max(0, rectPx.width));
+  const activeLineWidth = measureTokenLineWidth(this, controlsStyle, CONTROLS_LINES[normalizedActiveIndex]?.tokens || []);
+  const clampedHighlightWidth = Math.min(activeLineWidth || maxLineWidth, Math.max(0, rectPx.width));
 
   const highlight = this.add.rectangle(baseX, highlightY, clampedHighlightWidth, highlightHeight, 0x003300).setOrigin(0, 0);
   this.ui.add(highlight);
 
-  const content = CONTROLS_LINES.join("\n");
-  draw.bind(this)(content, {
-    offsetXPx: baseX,
-    offsetYPx: baseY,
-    lineSpacing: lineSpacingPx,
-    textStyle: controlsStyle,
-  });
+  for (let i = 0; i < CONTROLS_LINES.length; i += 1) {
+    const line = CONTROLS_LINES[i];
+    const lineY = Math.round(baseY + i * lineStepPx);
+    let cursorX = baseX;
+    for (const token of line.tokens || []) {
+      const tokenStyle = { ...controlsStyle, color: token.color || controlsStyle.color };
+      const tokenText = draw.bind(this)(token.text, {
+        offsetXPx: cursorX,
+        offsetYPx: lineY,
+        textStyle: tokenStyle,
+      });
+      if (tokenText) {
+        cursorX += Math.ceil(tokenText.width);
+      }
+    }
+  }
 }
 
 export default class StaticMap extends Phaser.Scene {
