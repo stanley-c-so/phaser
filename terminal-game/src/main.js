@@ -2,12 +2,19 @@ import Phaser from "phaser";
 
 import { COLORS } from "./config/constants";
 import StaticMap from "./scenes/StaticMap";
+import StaticMap2 from "./scenes/StaticMap2";
 
 const config = {
   type: Phaser.AUTO,
   backgroundColor: COLORS.BG,
+  // Use devicePixelRatio to avoid fractional CSS scaling causing text metric drift on Windows DPI settings.
+  resolution: window.devicePixelRatio || 1,
+  render: {
+    roundPixels: true,
+  },
   scene: [
     StaticMap,
+    // StaticMap2,
   ],
   scale: {
     // mode: Phaser.Scale.FIT,
@@ -57,6 +64,7 @@ async function startStaticMapWhenFontsReady() {
 
   try {
     game.scene.start("StaticMap");
+    // game.scene.start("StaticMap2");
   } catch (e) {
     console.error(e);
   }

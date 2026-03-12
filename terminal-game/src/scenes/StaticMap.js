@@ -288,6 +288,15 @@ function buildControlsLines(stage, hasJunctions, lockedUtilities, transferContex
       selectable: availableUtilities.has("H") && !isLocked("H"),
       utilityId: "H",
     },
+    {
+      tokens: availableUtilities.has("I") ? [
+        { text: "( ) ", color: CONTROLS_COLORS.bracket },
+        { text: "I  ", color: CONTROLS_COLORS.entity },
+        { text: "blah", color: CONTROLS_COLORS.label },
+      ] : [{ text: "", color: CONTROLS_COLORS.bracket }],
+      selectable: availableUtilities.has("I") && !isLocked("I"),
+      utilityId: "I",
+    },
   );
 
   // Toggle all switches
@@ -370,8 +379,9 @@ function getCanvasFontFromStyle(textStyle = {}) {
   const fontSize = typeof fontSizeRaw === "number"
     ? fontSizeRaw
     : parseFloat(String(fontSizeRaw).replace("px", "")) || 1;
+  const fontWeight = textStyle.fontWeight || "normal";
   const fontFamily = textStyle.fontFamily || "monospace";
-  return `${fontSize}px ${fontFamily}`;
+  return `${fontWeight} ${fontSize}px ${fontFamily}`;
 }
 
 function measureMapMaxLineWidthPx(scene, textStyle, lines) {
@@ -409,6 +419,24 @@ function measureMapBlockHeightPx(scene, textStyle, lines) {
   return Math.ceil((lines?.length || 0) * lineHeight);
 }
 
+function measureRenderedBlockPx(scene, textStyle, lines) {
+  const content = (lines || []).join("\n");
+  if (!content) {
+    return { width: 0, height: 0 };
+  }
+
+  const probe = scene.add.text(-100000, -100000, content, textStyle);
+  probe.setOrigin(0, 0);
+  probe.setResolution(scene.game?.renderer?.resolution || 1);
+  const bounds = probe.getBounds();
+  probe.destroy();
+
+  return {
+    width: Math.ceil(Math.max(0, bounds.width)),
+    height: Math.ceil(Math.max(0, bounds.height)),
+  };
+}
+
 function measureTokenLineWidth(scene, controlsStyle, tokens) {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
@@ -436,7 +464,9 @@ function measureLineStepPx(scene, controlsStyle, lineSpacingPx) {
   }
   ctx.font = getCanvasFontFromStyle(controlsStyle);
   const metrics = ctx.measureText("M");
-  const glyphHeight = (metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent) || fontSize;
+  const glyphHeight = (metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent)
+    || controlsStyle?.lineHeight
+    || fontSize;
   return Math.max(1, glyphHeight + (lineSpacingPx || 0));
 }
 
@@ -768,8 +798,9 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
     let sizePx = Math.max(1, Math.floor(startPx));
     while (sizePx > 1) {
       const style = makeTextStyle(sizePx);
-      const widthPx = measureMapMaxLineWidthPx(this, style, STATIC_MAP_STR);
-      const heightPx = measureMapBlockHeightPx(this, style, STATIC_MAP_STR);
+      const measured = measureRenderedBlockPx(this, style, STAGE3_STR);
+      const widthPx = measured.width;
+      const heightPx = measured.height;
       if (widthPx <= rectPx.width && heightPx <= rectPx.height) {
         break;
       }
@@ -783,30 +814,16 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
   const mapWidthPx = measureMapMaxLineWidthPx(this, mapTextStyle, STATIC_MAP_STR);
   const mapHeightPx = measureMapBlockHeightPx(this, mapTextStyle, STATIC_MAP_STR);
 
-  const targetWidthPx = measureMapMaxLineWidthPx(this, mapTextStyle, STAGE3_STR);
-  const targetHeightPx = measureMapBlockHeightPx(this, mapTextStyle, STAGE3_STR);
+  const stage3Measured = measureRenderedBlockPx(this, mapTextStyle, STAGE3_STR);
+  const targetWidthPx = stage3Measured.width;
+  const targetHeightPx = stage3Measured.height;
   const anchorXPx = rectPx.x + Math.max(0, Math.floor((rectPx.width - targetWidthPx) / 2));
   const anchorYPx = rectPx.y + Math.max(0, Math.floor((rectPx.height - targetHeightPx) / 2));
   const mapOriginXPx = Math.round(anchorXPx);
   const mapOriginYPx = Math.round(anchorYPx);
 
-  const mapLeftPx = mapOriginXPx;
-  const mapTopPx = mapOriginYPx;
-  const mapRightPx = mapLeftPx + mapWidthPx;
-  const mapBottomPx = mapTopPx + mapHeightPx;
-
-  const fitsInRect = (
-    mapLeftPx >= rectPx.x
-    && mapRightPx <= rectPx.x + rectPx.width
-    && mapTopPx >= rectPx.y
-    && mapBottomPx <= rectPx.y + rectPx.height
-  );
-
-  // Canvas too small to draw image
-  if (!fitsInRect) return;
-
   const rootUi = this.ui;
-  const mapContainer = this.add.container(0, 0);
+  const mapContainer = this.add.container(mapOriginXPx, mapOriginYPx);
   rootUi.add(mapContainer);
   this.ui = mapContainer;
 
@@ -932,8 +949,8 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
   //   this.buffer[row][0] = String(row % 10);
   // }
 
-  const baseX = mapOriginXPx;
-  const baseY = mapOriginYPx;
+  const baseX = 0;
+  const baseY = 0;
   const junctionChar = this.junctionDirection === "down" ? "┌" : "└";
   const arrowChar = this.switchDirection === "left" ? "<" : ">";
 
@@ -982,18 +999,37 @@ function drawMap({ parentRectPx, rectPct = MAP_RECT_PCT } = {}) {
   };
 
   drawLayer(baseLayer, { color: MAP_COLORS.default });
+  // Avoid per-line height drift: strokeThickness changes Text metrics for multiline text.
+  // Use bold weight instead so layered passes share identical line metrics.
   drawLayer(
     toLayerRows(isJunctionChar).map((row) => row.replace(/[\\/]/g, junctionChar)).join("\n"),
-    { color: MAP_COLORS.junction, stroke: MAP_COLORS.junction, strokeThickness: 1 }
+    { color: MAP_COLORS.junction, fontStyle: "bold" }
   );
   drawLayer(
     toLayerRows(isArrowChar).map((row) => row.replace(/[<>]/g, arrowChar)).join("\n"),
-    { color: MAP_COLORS.arrow, stroke: MAP_COLORS.arrow, strokeThickness: 1 }
+    { color: MAP_COLORS.arrow, fontStyle: "bold" }
   );
   const lockedUtilityLayer = buildLockedUtilityLayer(this.buffer, lockedUtilityMask);
   drawLayer(batteryLayer, { color: MAP_COLORS.battery });
   drawLayer(lockedUtilityLayer, { color: MAP_COLORS.utility_locked });
   drawLayer(toLayer(isLabelChar), { color: MAP_COLORS.label });
+
+  // Safety: ensure the rendered map fits in the allocated rect (accounts for stroke/metrics drift)
+  const bounds = mapContainer.getBounds();
+  if (bounds.width > 0 && bounds.height > 0) {
+    const scaleToFit = Math.min(
+      rectPx.width / bounds.width,
+      rectPx.height / bounds.height,
+      1
+    );
+    if (scaleToFit < 1) {
+      mapContainer.setScale(scaleToFit);
+      mapContainer.setPosition(
+        Math.round(rectPx.x + (rectPx.width - bounds.width * scaleToFit) / 2),
+        Math.round(rectPx.y + (rectPx.height - bounds.height * scaleToFit) / 2)
+      );
+    }
+  }
 
   this.ui = rootUi;
 }
@@ -1094,9 +1130,12 @@ export default class StaticMap extends Phaser.Scene {
     updateRegistryFromScale(this);
 
     // Initialize state
-    this.stage = 1;
-    this.currentMap = STATIC_MAP_ASCII_1;
-    this.currentMapConnections = MAP_CONNECTIONS_1;
+    // this.stage = 1;
+    // this.currentMap = STATIC_MAP_ASCII_1;
+    // this.currentMapConnections = MAP_CONNECTIONS_1;
+    this.stage = 3;
+    this.currentMap = STATIC_MAP_ASCII_3;
+    this.currentMapConnections = MAP_CONNECTIONS_3;
     this.switchDirection = "right";
     this.junctionDirection = "up";
     this.activeUtilityId = "A";
