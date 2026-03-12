@@ -50,7 +50,7 @@ const EMPTY_CHAR = "░";
 const STAGE_GOALS = {
   1: { utilityId: "A", targetLevel: 5, targetCapacity: 5, autoAdvance: true },
   2: { utilityId: "F", targetLevel: 4, targetCapacity: 4, autoAdvance: true },
-  3: { utilityId: "H", targetLevel: 2, targetCapacity: 3, autoAdvance: false },
+  3: { utilityId: "I", targetLevel: 2, targetCapacity: 3, autoAdvance: false },
 };
 
 function getStageHeaderLine(stage) {
@@ -283,7 +283,7 @@ function buildControlsLines(stage, hasJunctions, lockedUtilities, transferContex
       tokens: availableUtilities.has("H") ? [
         { text: "( ) ", color: CONTROLS_COLORS.bracket },
         { text: "H  ", color: CONTROLS_COLORS.entity },
-        { text: "Antiviral Synthesis Reactor", color: CONTROLS_COLORS.label },
+        { text: "blah", color: CONTROLS_COLORS.label },
       ] : [{ text: "", color: CONTROLS_COLORS.bracket }],
       selectable: availableUtilities.has("H") && !isLocked("H"),
       utilityId: "H",
@@ -292,7 +292,7 @@ function buildControlsLines(stage, hasJunctions, lockedUtilities, transferContex
       tokens: availableUtilities.has("I") ? [
         { text: "( ) ", color: CONTROLS_COLORS.bracket },
         { text: "I  ", color: CONTROLS_COLORS.entity },
-        { text: "blah", color: CONTROLS_COLORS.label },
+        { text: "Antiviral Synthesis Reactor", color: CONTROLS_COLORS.label },
       ] : [{ text: "", color: CONTROLS_COLORS.bracket }],
       selectable: availableUtilities.has("I") && !isLocked("I"),
       utilityId: "I",
@@ -1130,12 +1130,12 @@ export default class StaticMap extends Phaser.Scene {
     updateRegistryFromScale(this);
 
     // Initialize state
-    // this.stage = 1;
-    // this.currentMap = STATIC_MAP_ASCII_1;
-    // this.currentMapConnections = MAP_CONNECTIONS_1;
-    this.stage = 3;
-    this.currentMap = STATIC_MAP_ASCII_3;
-    this.currentMapConnections = MAP_CONNECTIONS_3;
+    this.stage = 1;
+    this.currentMap = STATIC_MAP_ASCII_1;
+    this.currentMapConnections = MAP_CONNECTIONS_1;
+    // this.stage = 3;
+    // this.currentMap = STATIC_MAP_ASCII_3;
+    // this.currentMapConnections = MAP_CONNECTIONS_3;
     this.switchDirection = "right";
     this.junctionDirection = "up";
     this.activeUtilityId = "A";
