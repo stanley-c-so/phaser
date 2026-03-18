@@ -49,7 +49,7 @@ const EMPTY_CHAR = "░";
 
 const STAGE_GOALS = {
   1: { utilityId: "A", targetLevel: 5, targetCapacity: 5, autoAdvance: true },
-  2: { utilityId: "F", targetLevel: 4, targetCapacity: 4, autoAdvance: true },
+  2: { utilityId: "E", targetLevel: 4, targetCapacity: 4, autoAdvance: true },
   3: { utilityId: "I", targetLevel: 2, targetCapacity: 3, autoAdvance: false },
 };
 
@@ -243,20 +243,20 @@ function buildControlsLines(stage, hasJunctions, lockedUtilities, transferContex
       selectable: availableUtilities.has("C") && !isLocked("C"),
       utilityId: "C",
     },
-    {
-      tokens: availableUtilities.has("D") ? [
-        { text: "( ) ", color: CONTROLS_COLORS.bracket },
-        { text: "D  ", color: CONTROLS_COLORS.entity },
-        { text: "Staff Decontamination Shower", color: CONTROLS_COLORS.label },
-      ] : [{ text: "", color: CONTROLS_COLORS.bracket }],
-      selectable: availableUtilities.has("D") && !isLocked("D"),
-      utilityId: "D",
-    },
+    // {
+    //   tokens: availableUtilities.has("D") ? [
+    //     { text: "( ) ", color: CONTROLS_COLORS.bracket },
+    //     { text: "D  ", color: CONTROLS_COLORS.entity },
+    //     { text: "Staff Decontamination Shower", color: CONTROLS_COLORS.label },
+    //   ] : [{ text: "", color: CONTROLS_COLORS.bracket }],
+    //   selectable: availableUtilities.has("D") && !isLocked("D"),
+    //   utilityId: "D",
+    // },
     {
       tokens: availableUtilities.has("E") ? [
         { text: "( ) ", color: CONTROLS_COLORS.bracket },
         { text: "E  ", color: CONTROLS_COLORS.entity },
-        { text: "Inter-wing Power Relay", color: CONTROLS_COLORS.label },
+        { text: "Genomic Analysis Array", color: CONTROLS_COLORS.label },
       ] : [{ text: "", color: CONTROLS_COLORS.bracket }],
       selectable: availableUtilities.has("E") && !isLocked("E"),
       utilityId: "E",
@@ -265,7 +265,7 @@ function buildControlsLines(stage, hasJunctions, lockedUtilities, transferContex
       tokens: availableUtilities.has("F") ? [
         { text: "( ) ", color: CONTROLS_COLORS.bracket },
         { text: "F  ", color: CONTROLS_COLORS.entity },
-        { text: "Genomic Analysis Array", color: CONTROLS_COLORS.label },
+        { text: "Inter-wing Power Relay", color: CONTROLS_COLORS.label },
       ] : [{ text: "", color: CONTROLS_COLORS.bracket }],
       selectable: availableUtilities.has("F") && !isLocked("F"),
       utilityId: "F",
