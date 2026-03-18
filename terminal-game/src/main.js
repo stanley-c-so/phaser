@@ -2,7 +2,14 @@ import Phaser from "phaser";
 
 import { COLORS } from "./config/constants";
 import StaticMap from "./scenes/StaticMap";
-import StaticMap2 from "./scenes/StaticMap2";
+import RefactoredMap from "./scenes/RefactoredMap";
+
+const MAP = {
+  // scene: StaticMap,
+  // label: "StaticMap",
+  scene: RefactoredMap,
+  label: "RefactoredMap",
+}
 
 const config = {
   type: Phaser.AUTO,
@@ -13,8 +20,7 @@ const config = {
     roundPixels: true,
   },
   scene: [
-    StaticMap,
-    // StaticMap2,
+    MAP.scene,
   ],
   scale: {
     // mode: Phaser.Scale.FIT,
@@ -63,8 +69,7 @@ async function startStaticMapWhenFontsReady() {
   }
 
   try {
-    game.scene.start("StaticMap");
-    // game.scene.start("StaticMap2");
+    game.scene.start(MAP.label);
   } catch (e) {
     console.error(e);
   }
