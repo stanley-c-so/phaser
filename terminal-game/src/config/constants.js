@@ -19,8 +19,8 @@ function deriveDiagramMinGrid() {
 export const DIAGRAM_MIN_GRID = deriveDiagramMinGrid();
 
 export const EXTRA_MARGINS_IN_PX = {
-  top: 50,
-  bottom: 50,
+  top: 25,
+  bottom: 25,
   left: 0,
   right: 0,
 };
