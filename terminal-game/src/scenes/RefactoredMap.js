@@ -79,6 +79,11 @@ const UI_NUMBERS = {
   utilityLineWidthPx: 1,
   utilityLineActiveAlpha: 1,
   utilityLineInactiveAlpha: 0.25,
+  transferDotCount: 4,
+  transferDotRadiusPx: 2,
+  transferDotAlpha: 1,
+  transferDotDurationMs: 180,
+  transferDotStaggerMs: 35,
   cursorHighlightWidthPx: 1,
   cursorHighlightAlpha: 1,
   cursorHighlightInsetPx: 3,
@@ -302,6 +307,7 @@ function createInitialGameState() {
     sourceSelection: null,
     targetSelection: null,
     lockedEntities: {},
+    pendingTransfer: null,
     transferStatus: { message: "Initializing stage map", type: "ok" },
     junctionDirection: "up",
     batteries: {},
@@ -402,6 +408,78 @@ function reduceGameState(state, intent) {
   const payload = intent.payload || {};
 
   switch (intent.type) {
+    case "APPLY_PENDING_TRANSFER": {
+      const transfer = intent.payload?.transfer || state.pendingTransfer;
+      if (!transfer) {
+        return state;
+      }
+
+      const { sourceSide, sourceId, targetSide, targetId, moved } = transfer;
+      const nextBatteries = { ...state.batteries };
+      const nextUtilities = { ...state.utilities };
+
+      if (sourceSide === "left") {
+        nextBatteries[sourceId] = { ...nextBatteries[sourceId], level: nextBatteries[sourceId].level - moved };
+        nextUtilities[targetId] = { ...nextUtilities[targetId], level: nextUtilities[targetId].level + moved };
+      } else {
+        nextUtilities[sourceId] = { ...nextUtilities[sourceId], level: nextUtilities[sourceId].level - moved };
+        nextBatteries[targetId] = { ...nextBatteries[targetId], level: nextBatteries[targetId].level + moved };
+      }
+
+      const destinationIds = getVisibleEntityIds(state, targetSide);
+      const destinationIndex = Math.max(0, destinationIds.indexOf(targetId));
+      const sourceName = getEntityDisplayName(sourceSide, sourceId);
+      const destinationName = getEntityDisplayName(targetSide, targetId);
+
+      const updatedMap = mergeMapData(state.currentMap || {}, {
+        batteries: nextBatteries,
+        utilities: nextUtilities,
+      });
+
+      const stateAfterTransfer = {
+        ...state,
+        mode: "pick_source",
+        cursor: {
+          side: targetSide,
+          index: destinationIndex,
+        },
+        sourceSelection: null,
+        targetSelection: null,
+        batteries: nextBatteries,
+        utilities: nextUtilities,
+        currentMap: updatedMap,
+        pendingTransfer: null,
+        transferStatus: {
+          message: `Transferred ${moved} unit${moved === 1 ? "" : "s"} from ${sourceName} to ${destinationName}`,
+          type: "ok",
+        },
+      };
+
+      const goalCheck = evaluateStageGoal(stateAfterTransfer);
+      if (goalCheck.met) {
+        const withLockedGoals = lockCurrentGoalEntities(stateAfterTransfer);
+        if ((withLockedGoals.mapStage ?? -1) >= MAP_STATES.length - 1) {
+          return {
+            ...withLockedGoals,
+            transferStatus: {
+              message: "Goal met. Final stage complete!",
+              type: "ok",
+            },
+          };
+        }
+        const advanced = nextStage(withLockedGoals);
+        return {
+          ...advanced,
+          transferStatus: {
+            message: `Goal met. Stage ${advanced.stage} loaded`,
+            type: "ok",
+          },
+        };
+      }
+
+      return stateAfterTransfer;
+    }
+
     case "NEXT_STAGE": {
       const currentGoal = evaluateStageGoal(state);
       const withLockedGoals = currentGoal.met ? lockCurrentGoalEntities(state) : state;
@@ -584,69 +662,23 @@ function reduceGameState(state, intent) {
             },
           };
         }
-
-        const nextBatteries = { ...state.batteries };
-        const nextUtilities = { ...state.utilities };
-
-        if (sourceSide === "left") {
-          nextBatteries[sourceId] = { ...nextBatteries[sourceId], level: nextBatteries[sourceId].level - moved };
-          nextUtilities[targetId] = { ...nextUtilities[targetId], level: nextUtilities[targetId].level + moved };
-        } else {
-          nextUtilities[sourceId] = { ...nextUtilities[sourceId], level: nextUtilities[sourceId].level - moved };
-          nextBatteries[targetId] = { ...nextBatteries[targetId], level: nextBatteries[targetId].level + moved };
-        }
-
-        const destinationIds = getVisibleEntityIds(state, targetSide);
-        const destinationIndex = Math.max(0, destinationIds.indexOf(targetId));
         const sourceName = getEntityDisplayName(sourceSide, sourceId);
         const destinationName = getEntityDisplayName(targetSide, targetId);
 
-        const updatedMap = mergeMapData(state.currentMap || {}, {
-          batteries: nextBatteries,
-          utilities: nextUtilities,
-        });
-
-        const stateAfterTransfer = {
+        return {
           ...state,
-          mode: "pick_source",
-          cursor: {
-            side: targetSide,
-            index: destinationIndex,
+          pendingTransfer: {
+            sourceSide,
+            sourceId,
+            targetSide,
+            targetId,
+            moved,
           },
-          sourceSelection: null,
-          targetSelection: null,
-          batteries: nextBatteries,
-          utilities: nextUtilities,
-          currentMap: updatedMap,
           transferStatus: {
-            message: `Transferred ${moved} unit${moved === 1 ? "" : "s"} from ${sourceName} to ${destinationName}`,
+            message: `Transferring ${moved} unit${moved === 1 ? "" : "s"} from ${sourceName} to ${destinationName}...`,
             type: "ok",
           },
         };
-
-        const goalCheck = evaluateStageGoal(stateAfterTransfer);
-        if (goalCheck.met) {
-          const withLockedGoals = lockCurrentGoalEntities(stateAfterTransfer);
-          if ((withLockedGoals.mapStage ?? -1) >= MAP_STATES.length - 1) {
-            return {
-              ...withLockedGoals,
-              transferStatus: {
-                message: "Goal met. Final stage complete!",
-                type: "ok",
-              },
-            };
-          }
-          const advanced = nextStage(withLockedGoals);
-          return {
-            ...advanced,
-            transferStatus: {
-              message: `Goal met. Stage ${advanced.stage} loaded`,
-              type: "ok",
-            },
-          };
-        }
-
-        return stateAfterTransfer;
       }
 
       const sourceSide = state.cursor?.side || "left";
@@ -695,6 +727,7 @@ function reduceGameState(state, intent) {
         mode: "pick_target",
         sourceSelection: { side: sourceSide, id: sourceId },
         targetSelection: null,
+        pendingTransfer: null,
         cursor: {
           side: targetSide,
           index: 0,
@@ -1013,6 +1046,8 @@ function buildUtilityLines(state, utilityShapes, slotAssignments) {
     for (const anchor of anchors) {
       const activeTargets = byDirection[anchor.batteryId] || [];
       lines.push({
+        utilityId: utility.id,
+        batteryId: anchor.batteryId,
         x1: anchor.lineStartX,
         y1: anchor.centerY,
         x2: utility.cells[0].x - UI_NUMBERS.utilityLineGapBeforeCellsPx,
@@ -1360,6 +1395,9 @@ export default class RefactoredMap extends Phaser.Scene {
     super("RefactoredMap");
     this.gameState = createInitialGameState();
     this.ui = null;
+    this.fx = null;
+    this.lastViewModel = null;
+    this.transferAnimationActive = false;
     this.statusMessageText = null;
     this.statusTypingEvent = null;
     this.statusTargetMessage = "";
@@ -1369,6 +1407,7 @@ export default class RefactoredMap extends Phaser.Scene {
 
   create() {
     updateRegistryFromScale(this);
+    this.fx = this.add.container(0, 0);
     this.bindInput();
     this.render();
 
@@ -1384,6 +1423,96 @@ export default class RefactoredMap extends Phaser.Scene {
       updateRegistryFromScale(this);
       this.render();
     });
+  }
+
+  clearTransferFx() {
+    this.fx?.removeAll(true);
+  }
+
+  getTransferPath(transfer) {
+    const viewModel = this.lastViewModel;
+    if (!viewModel) {
+      return null;
+    }
+
+    const activeLine = (viewModel.mapPanel.utilityLines || []).find((line) => {
+      if (!line.isActive) {
+        return false;
+      }
+
+      if (transfer.sourceSide === "left" && transfer.targetSide === "right") {
+        return line.batteryId === transfer.sourceId && line.utilityId === transfer.targetId;
+      }
+
+      if (transfer.sourceSide === "right" && transfer.targetSide === "left") {
+        return line.batteryId === transfer.targetId && line.utilityId === transfer.sourceId;
+      }
+
+      return false;
+    });
+
+    if (!activeLine) {
+      return null;
+    }
+
+    if (transfer.sourceSide === "left") {
+      return {
+        start: { x: activeLine.x1, y: activeLine.y1 },
+        end: { x: activeLine.x2, y: activeLine.y2 },
+      };
+    }
+
+    return {
+      start: { x: activeLine.x2, y: activeLine.y2 },
+      end: { x: activeLine.x1, y: activeLine.y1 },
+    };
+  }
+
+  playPendingTransferAnimation(transfer) {
+    const path = this.getTransferPath(transfer);
+    if (!path) {
+      this.transferAnimationActive = false;
+      this.dispatch({ type: "APPLY_PENDING_TRANSFER", payload: { transfer } });
+      return;
+    }
+
+    this.transferAnimationActive = true;
+    this.clearTransferFx();
+
+    const dotColor = parseInt(UI_COLORS.accent.replace("#", ""), 16);
+    const dotCount = UI_NUMBERS.transferDotCount;
+    let completed = 0;
+
+    const finishOne = () => {
+      completed += 1;
+      if (completed < dotCount) {
+        return;
+      }
+      this.clearTransferFx();
+      this.transferAnimationActive = false;
+      this.dispatch({ type: "APPLY_PENDING_TRANSFER", payload: { transfer } });
+    };
+
+    for (let i = 0; i < dotCount; i += 1) {
+      const dot = this.add.circle(path.start.x, path.start.y, UI_NUMBERS.transferDotRadiusPx, dotColor, UI_NUMBERS.transferDotAlpha);
+      this.fx.add(dot);
+
+      this.tweens.addCounter({
+        from: 0,
+        to: 1,
+        duration: UI_NUMBERS.transferDotDurationMs,
+        delay: i * UI_NUMBERS.transferDotStaggerMs,
+        onUpdate: (tween) => {
+          const t = tween.getValue();
+          dot.x = Phaser.Math.Linear(path.start.x, path.end.x, t);
+          dot.y = Phaser.Math.Linear(path.start.y, path.end.y, t);
+        },
+        onComplete: () => {
+          dot.destroy();
+          finishOne();
+        },
+      });
+    }
   }
 
   clearStatusTypingEvent() {
@@ -1486,9 +1615,19 @@ export default class RefactoredMap extends Phaser.Scene {
   }
 
   dispatch(intent) {
+    if (this.transferAnimationActive && intent?.type !== "APPLY_PENDING_TRANSFER") {
+      return;
+    }
+
+    const pendingBefore = this.gameState?.pendingTransfer;
     this.gameState = reduceGameState(this.gameState, intent);
     this.registry.set("debugLayout", this.gameState.debugLayout);
     this.render();
+
+    const pendingAfter = this.gameState?.pendingTransfer;
+    if (!pendingBefore && pendingAfter) {
+      this.playPendingTransferAnimation(pendingAfter);
+    }
   }
 
   render() {
@@ -1498,10 +1637,12 @@ export default class RefactoredMap extends Phaser.Scene {
 
     const gridOriginPx = this.registry.get("gridOriginPx") || { x: 0, y: 0 };
     this.ui.setPosition(gridOriginPx.x, gridOriginPx.y);
+    this.fx?.setPosition(gridOriginPx.x, gridOriginPx.y);
 
     const { innerRectPx } = drawBorderBox.bind(this)("Power Puzzle");
 
     const viewModel = buildViewModel(this.gameState, innerRectPx);
+    this.lastViewModel = viewModel;
     renderFromViewModel(this, viewModel);
     // if (viewModel.debugLayout) {
     //   drawLayoutDebug(this, innerRectPx, MAP_RECT_PCT, STATUS_RECT_PCT);
