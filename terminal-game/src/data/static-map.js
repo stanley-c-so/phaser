@@ -7,23 +7,27 @@ export const MAP_STATE_1 = {
     A: { level: 1, capacity: 5 },
     B: { level: 2, capacity: 3 },
     C: { level: 3, capacity: 3 },
+    D: { level: 0, capacity: 4 },
   },
   batteries: {
     "1": { level: 0, capacity: 4 },
   },
   connections: {
     up: {
-      "1": ["A", "B", "C"],
+      "1": ["A", "B", "C", "D"],
     },
     down: {
       "1": ["A", "B", "C"],
     },
-  }
+  },
+  goal: {
+    A: 5,
+  },
 };
 
 export const MAP_STATE_2 = {
   utilities: {
-    D: { level: 0, capacity: 4 },
+    // D: { level: 0, capacity: 4 },
     E: { level: 3, capacity: 3 },
   },
   batteries: {
@@ -38,7 +42,10 @@ export const MAP_STATE_2 = {
       "1": ["A", "B", "C"],
       "2": ["D", "E"],
     },
-  }
+  },
+  goal: {
+    D: 4,
+  },
 };
 
 export const MAP_STATE_3 = {
@@ -62,7 +69,10 @@ export const MAP_STATE_3 = {
       "3": ["F"],
       "4": ["G", "H"],
     },
-  }
+  },
+  goal: {
+    H: 2,
+  },
 };
 
 

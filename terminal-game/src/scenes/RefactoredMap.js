@@ -2,11 +2,19 @@ import Phaser from "phaser";
 
 import {
   MAP_STATE_1,
+  MAP_STATE_2,
+  MAP_STATE_3,
 } from "../data/static-map";
 import { makeTextStyle } from "../config/constants";
 import { draw, drawBorderBox } from "../utils/draw";
 import { drawLayoutDebug } from "../utils/debug";
 import { updateRegistryFromScale } from "../utils/registry";
+
+const MAP_STATES = [
+  MAP_STATE_1,
+  MAP_STATE_2,
+  MAP_STATE_3,
+];
 
 const MAP_RECT_PCT = { x0: 0, y0: 0, x1: 100, y1: 90 };
 const STATUS_RECT_PCT = { x0: 0, y0: 90, x1: 100, y1: 100 };
@@ -69,6 +77,17 @@ const UI_NUMBERS = {
   utilityFillAlpha: 0.5,
   utilityFallbackTopPaddingRatio: 0.16,
   utilityLineWidthPx: 1,
+  utilityLineActiveAlpha: 1,
+  utilityLineInactiveAlpha: 0.25,
+  cursorHighlightWidthPx: 1,
+  cursorHighlightAlpha: 1,
+  cursorHighlightInsetPx: 3,
+  validTargetHighlightWidthPx: 1,
+  validTargetHighlightAlpha: 1,
+  validTargetHighlightInsetPx: 4,
+  lockedHighlightWidthPx: 1,
+  lockedHighlightAlpha: 1,
+  lockedHighlightInsetPx: 5,
   statusMessageOffsetRatio: 0.55,
   statusInfoOffsetXPx: 120,
   statusInfoOffsetYPx: 10,
@@ -79,13 +98,11 @@ const UI_COLORS = {
   body: "#6BFF9C",
   accent: "#00FFFF",
   subtle: "#4A8F68",
+  cursor: "#FFFFFF",
+  locked: "#CDEB78",
+  validTarget: "#6EE08C",
+  goalLocked: "#FF9F1C",
 };
-
-const CONTROL_ITEMS = [
-  { id: "select_source", label: "Select source" },
-  { id: "select_target", label: "Select target" },
-  { id: "transfer", label: "Initiate transfer" },
-];
 
 function rectPctToPx(rectPct, parentRectPx) {
   const x0 = Math.round(parentRectPx.x + (parentRectPx.width * rectPct.x0) / 100);
@@ -100,37 +117,280 @@ function rectPctToPx(rectPct, parentRectPx) {
   };
 }
 
-function createInitialGameState() {
-  const batteryState = Object.fromEntries(
-    Object.entries(MAP_STATE_1.batteries || {}).map(([id, spec]) => [
-      id,
-      { level: spec.level, capacity: spec.capacity },
-    ])
-  );
-  const utilityState = Object.fromEntries(
-    Object.entries(MAP_STATE_1.utilities || {}).map(([id, spec]) => [
-      id,
-      { level: spec.level, capacity: spec.capacity },
-    ])
-  );
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function mergeMapData(baseMap, stageMap) {
+  const base = isPlainObject(baseMap) ? baseMap : {};
+  const stage = isPlainObject(stageMap) ? stageMap : {};
+  const merged = { ...base };
+
+  for (const key of Object.keys(stage)) {
+    const baseValue = base[key];
+    const stageValue = stage[key];
+
+    if (Array.isArray(stageValue)) {
+      merged[key] = [...stageValue];
+    } else if (isPlainObject(stageValue)) {
+      merged[key] = mergeMapData(isPlainObject(baseValue) ? baseValue : {}, stageValue);
+    } else {
+      merged[key] = stageValue;
+    }
+  }
+
+  return merged;
+}
+
+function makeEntityKey(side, id) {
+  return `${side}:${id}`;
+}
+
+function isEntityLocked(state, side, id) {
+  if (!id) {
+    return false;
+  }
+  return Boolean(state.lockedEntities?.[makeEntityKey(side, id)]);
+}
+
+function lockCurrentGoalEntities(state) {
+  const goal = state.currentMap?.goal || {};
+  const goalEntries = Object.entries(goal);
+  if (goalEntries.length === 0) {
+    return state;
+  }
+
+  const nextLocked = { ...(state.lockedEntities || {}) };
+  for (const [entityId] of goalEntries) {
+    if (state.utilities?.[entityId]) {
+      nextLocked[makeEntityKey("right", entityId)] = true;
+    } else if (state.batteries?.[entityId]) {
+      nextLocked[makeEntityKey("left", entityId)] = true;
+    }
+  }
 
   return {
-    stage: 1,
+    ...state,
+    lockedEntities: nextLocked,
+  };
+}
+
+function buildLiveMapSnapshot(state) {
+  return {
+    ...(state.currentMap || {}),
+    batteries: state.batteries || {},
+    utilities: state.utilities || {},
+  };
+}
+
+function evaluateStageGoal(state) {
+  const goal = state.currentMap?.goal || {};
+  const goalEntries = Object.entries(goal);
+  if (goalEntries.length === 0) {
+    return { met: false, pending: [] };
+  }
+
+  const pending = [];
+  for (const [entityId, targetLevelRaw] of goalEntries) {
+    const targetLevel = Number(targetLevelRaw);
+    const utility = state.utilities?.[entityId];
+    const battery = state.batteries?.[entityId];
+
+    if (utility) {
+      if (Number(utility.level) !== targetLevel) {
+        pending.push(`${getEntityDisplayName("right", entityId)}: ${utility.level}/${targetLevel}`);
+      }
+      continue;
+    }
+
+    if (battery) {
+      if (Number(battery.level) !== targetLevel) {
+        pending.push(`${getEntityDisplayName("left", entityId)}: ${battery.level}/${targetLevel}`);
+      }
+      continue;
+    }
+
+    pending.push(`${entityId}: missing/${targetLevel}`);
+  }
+
+  return {
+    met: pending.length === 0,
+    pending,
+  };
+}
+
+function buildGoalStatusText(state) {
+  const goal = state.currentMap?.goal || {};
+  const entries = Object.entries(goal);
+  if (entries.length === 0) {
+    return "No goal";
+  }
+
+  if (entries.length === 1) {
+    const [entityId, targetLevel] = entries[0];
+    const side = state.utilities?.[entityId] ? "right" : "left";
+    const name = getEntityDisplayName(side, entityId);
+    return `Set power level of ${name} to ${targetLevel}`;
+  }
+
+  const parts = entries.map(([entityId, targetLevel]) => {
+    const side = state.utilities?.[entityId] ? "right" : "left";
+    const name = getEntityDisplayName(side, entityId);
+    return `${name}=${targetLevel}`;
+  });
+  return `Set power levels: ${parts.join(", ")}`;
+}
+
+function buildStateFromMapData(state, currentMap, mapStage) {
+  const connections = currentMap?.connections || {};
+  const nextJunctionDirection = connections[state.junctionDirection]
+    ? state.junctionDirection
+    : "up";
+
+  return {
+    ...state,
+    mapStage,
+    stage: mapStage + 1,
+    currentMap,
     mode: "pick_source",
-    selectedControlIndex: 0,
     cursor: { side: "left", index: 0 },
     sourceSelection: null,
     targetSelection: null,
-    transferStatus: { message: "Slice 1 scaffold ready", type: "ok" },
-    junctionDirection: "up",
-    batteries: batteryState,
-    utilities: utilityState,
+    lockedEntities: state.lockedEntities || {},
+    junctionDirection: nextJunctionDirection,
+    batteries: currentMap?.batteries || {},
+    utilities: currentMap?.utilities || {},
     connections: {
-      up: MAP_STATE_1.connections?.up || {},
-      down: MAP_STATE_1.connections?.down || {},
+      up: connections.up || {},
+      down: connections.down || {},
     },
+  };
+}
+
+function nextStage(state) {
+  const nextMapStage = (state.mapStage ?? -1) + 1;
+  if (nextMapStage < 0 || nextMapStage >= MAP_STATES.length) {
+    return {
+      ...state,
+      transferStatus: {
+        message: "No more stages available",
+        type: "error",
+      },
+    };
+  }
+
+  const stageMap = MAP_STATES[nextMapStage] || {};
+  const mergedMap = mergeMapData(buildLiveMapSnapshot(state), stageMap);
+  mergedMap.goal = isPlainObject(stageMap.goal) ? { ...stageMap.goal } : {};
+  return {
+    ...buildStateFromMapData(state, mergedMap, nextMapStage),
+    transferStatus: {
+      message: `Stage ${nextMapStage + 1} loaded`,
+      type: "ok",
+    },
+  };
+}
+
+function createInitialGameState() {
+  const baseState = {
+    stage: 0,
+    mapStage: -1,
+    currentMap: {},
+    mode: "pick_source",
+    cursor: { side: "left", index: 0 },
+    sourceSelection: null,
+    targetSelection: null,
+    lockedEntities: {},
+    transferStatus: { message: "Initializing stage map", type: "ok" },
+    junctionDirection: "up",
+    batteries: {},
+    utilities: {},
+    connections: { up: {}, down: {} },
     debugLayout: false,
   };
+
+  return nextStage(baseState);
+}
+
+function getVisibleEntityIds(state, side) {
+  if (side === "left") {
+    return Object.keys(state.batteries || {}).sort((a, b) => Number(a) - Number(b));
+  }
+  return Object.keys(state.utilities || {}).sort((a, b) => a.localeCompare(b));
+}
+
+function normalizeCursorIndex(index, count) {
+  if (count <= 0) {
+    return 0;
+  }
+  return ((index % count) + count) % count;
+}
+
+function findFirstConnectedUtility(state, batteryId) {
+  const byDirection = state.connections?.[state.junctionDirection] || {};
+  const connected = byDirection[batteryId] || [];
+  return connected.length > 0 ? connected[0] : null;
+}
+
+function findFirstConnectedBattery(state, utilityId) {
+  const byDirection = state.connections?.[state.junctionDirection] || {};
+  const batteryIds = Object.keys(byDirection).sort((a, b) => Number(a) - Number(b));
+  for (const batteryId of batteryIds) {
+    if ((byDirection[batteryId] || []).includes(utilityId)) {
+      return batteryId;
+    }
+  }
+  return null;
+}
+
+function getConnectedTargetsForSource(state, sourceSide, sourceId) {
+  const byDirection = state.connections?.[state.junctionDirection] || {};
+  if (!sourceId) {
+    return { targetSide: sourceSide === "left" ? "right" : "left", targetIds: [] };
+  }
+
+  if (sourceSide === "left") {
+    const targetIds = (byDirection[sourceId] || []).filter((id) => Boolean(state.utilities?.[id]));
+    return { targetSide: "right", targetIds };
+  }
+
+  const targetIds = Object.keys(byDirection)
+    .filter((batteryId) => (byDirection[batteryId] || []).includes(sourceId))
+    .sort((a, b) => Number(a) - Number(b));
+  return { targetSide: "left", targetIds };
+}
+
+function getSelectableIdsForSide(state, side) {
+  const lockedSource = state.sourceSelection;
+  if (!lockedSource) {
+    return getVisibleEntityIds(state, side);
+  }
+
+  const { targetSide, targetIds } = getConnectedTargetsForSource(state, lockedSource.side, lockedSource.id);
+  if (side === targetSide) {
+    return targetIds;
+  }
+  if (side === lockedSource.side) {
+    return [lockedSource.id];
+  }
+  return [];
+}
+
+function getCursorEntityId(state) {
+  const side = state.cursor?.side || "left";
+  const ids = getSelectableIdsForSide(state, side);
+  const index = normalizeCursorIndex(state.cursor?.index || 0, ids.length);
+  return ids[index] || null;
+}
+
+function getEntityDisplayName(side, id) {
+  if (!id) {
+    return "Unknown";
+  }
+  if (side === "left") {
+    return `B${id}`;
+  }
+  return UTILITY_LABELS[id] || `Label ${id}`;
 }
 
 function reduceGameState(state, intent) {
@@ -141,6 +401,37 @@ function reduceGameState(state, intent) {
   const payload = intent.payload || {};
 
   switch (intent.type) {
+    case "NEXT_STAGE": {
+      const currentGoal = evaluateStageGoal(state);
+      const withLockedGoals = currentGoal.met ? lockCurrentGoalEntities(state) : state;
+      return nextStage(withLockedGoals);
+    }
+
+    case "TOGGLE_JUNCTION": {
+      const nextDirection = state.junctionDirection === "up" ? "down" : "up";
+      const side = state.sourceSelection
+        ? (state.sourceSelection.side === "left" ? "right" : "left")
+        : (state.cursor?.side || "left");
+      const nextState = {
+        ...state,
+        junctionDirection: nextDirection,
+      };
+      const ids = getSelectableIdsForSide(nextState, side);
+      const nextIndex = normalizeCursorIndex(state.cursor?.index || 0, ids.length);
+
+      return {
+        ...nextState,
+        cursor: {
+          side,
+          index: nextIndex,
+        },
+        transferStatus: {
+          message: `Junction set to ${nextDirection}`,
+          type: "ok",
+        },
+      };
+    }
+
     case "TOGGLE_DEBUG_LAYOUT": {
       return {
         ...state,
@@ -148,15 +439,297 @@ function reduceGameState(state, intent) {
       };
     }
 
-    // case "MOVE_CONTROL_SELECTION": {
-    //   const direction = payload.direction === "up" ? -1 : 1;
-    //   const N = CONTROL_ITEMS.length;
-    //   const next = (state.selectedControlIndex + direction + N) % N;
-    //   return {
-    //     ...state,
-    //     selectedControlIndex: next,
-    //   };
-    // }
+    case "MOVE_CURSOR": {
+      const direction = payload.direction;
+      const lockedSource = state.sourceSelection;
+      const side = lockedSource
+        ? (lockedSource.side === "left" ? "right" : "left")
+        : (state.cursor?.side || "left");
+      const ids = getSelectableIdsForSide(state, side);
+      const index = normalizeCursorIndex(state.cursor?.index || 0, ids.length);
+
+      if (direction === "up" || direction === "down") {
+        const delta = direction === "up" ? -1 : 1;
+        const nextIndex = normalizeCursorIndex(index + delta, ids.length);
+        return {
+          ...state,
+          cursor: {
+            side,
+            index: nextIndex,
+          },
+        };
+      }
+
+      if (lockedSource) {
+        return state;
+      }
+
+      if (direction === "right") {
+        if (side === "right") {
+          return state;
+        }
+        const batteryId = ids[index] || null;
+        const utilityIds = getVisibleEntityIds(state, "right");
+        const preferredUtility = batteryId ? findFirstConnectedUtility(state, batteryId) : null;
+        const nextIndex = preferredUtility
+          ? Math.max(0, utilityIds.indexOf(preferredUtility))
+          : normalizeCursorIndex(index, utilityIds.length);
+        return {
+          ...state,
+          cursor: {
+            side: "right",
+            index: nextIndex,
+          },
+        };
+      }
+
+      if (direction === "left") {
+        if (side === "left") {
+          return state;
+        }
+        const utilityId = ids[index] || null;
+        const batteryIds = getVisibleEntityIds(state, "left");
+        const preferredBattery = utilityId ? findFirstConnectedBattery(state, utilityId) : null;
+        const nextIndex = preferredBattery
+          ? Math.max(0, batteryIds.indexOf(preferredBattery))
+          : normalizeCursorIndex(index, batteryIds.length);
+        return {
+          ...state,
+          cursor: {
+            side: "left",
+            index: nextIndex,
+          },
+        };
+      }
+
+      return state;
+    }
+
+    case "CONFIRM_SELECTION": {
+      if (state.sourceSelection) {
+        const sourceSide = state.sourceSelection.side;
+        const sourceId = state.sourceSelection.id;
+        const targetSide = sourceSide === "left" ? "right" : "left";
+        const targetId = getCursorEntityId(state);
+
+        if (!targetId) {
+          return {
+            ...state,
+            transferStatus: {
+              message: "No target selected",
+              type: "error",
+            },
+          };
+        }
+
+        const sourcePool = sourceSide === "left" ? state.batteries : state.utilities;
+        const targetPool = targetSide === "left" ? state.batteries : state.utilities;
+        const source = sourcePool?.[sourceId];
+        const target = targetPool?.[targetId];
+
+        if (!source || !target) {
+          return {
+            ...state,
+            transferStatus: {
+              message: "Transfer failed: invalid source/target",
+              type: "error",
+            },
+          };
+        }
+
+        if (isEntityLocked(state, sourceSide, sourceId) || isEntityLocked(state, targetSide, targetId)) {
+          const lockedName = isEntityLocked(state, sourceSide, sourceId)
+            ? getEntityDisplayName(sourceSide, sourceId)
+            : getEntityDisplayName(targetSide, targetId);
+          return {
+            ...state,
+            mode: "pick_source",
+            sourceSelection: null,
+            targetSelection: null,
+            transferStatus: {
+              message: `${lockedName} is locked`,
+              type: "error",
+            },
+          };
+        }
+
+        const available = Math.max(0, source.level || 0);
+        const remaining = Math.max(0, (target.capacity || 0) - (target.level || 0));
+        const moved = Math.min(available, remaining);
+
+        const sourceIds = getVisibleEntityIds(state, sourceSide);
+        const sourceIndex = Math.max(0, sourceIds.indexOf(sourceId));
+
+        if (moved <= 0) {
+          const sourceName = getEntityDisplayName(sourceSide, sourceId);
+          const destinationName = getEntityDisplayName(targetSide, targetId);
+          const errorMsg = available <= 0
+            ? `${sourceName} has no charge`
+            : remaining <= 0
+              ? `${destinationName} is full`
+              : "No transferable energy";
+          return {
+            ...state,
+            mode: "pick_source",
+            cursor: {
+              side: sourceSide,
+              index: sourceIndex,
+            },
+            sourceSelection: null,
+            targetSelection: null,
+            transferStatus: {
+              message: errorMsg,
+              type: "error",
+            },
+          };
+        }
+
+        const nextBatteries = { ...state.batteries };
+        const nextUtilities = { ...state.utilities };
+
+        if (sourceSide === "left") {
+          nextBatteries[sourceId] = { ...nextBatteries[sourceId], level: nextBatteries[sourceId].level - moved };
+          nextUtilities[targetId] = { ...nextUtilities[targetId], level: nextUtilities[targetId].level + moved };
+        } else {
+          nextUtilities[sourceId] = { ...nextUtilities[sourceId], level: nextUtilities[sourceId].level - moved };
+          nextBatteries[targetId] = { ...nextBatteries[targetId], level: nextBatteries[targetId].level + moved };
+        }
+
+        const destinationIds = getVisibleEntityIds(state, targetSide);
+        const destinationIndex = Math.max(0, destinationIds.indexOf(targetId));
+        const sourceName = getEntityDisplayName(sourceSide, sourceId);
+        const destinationName = getEntityDisplayName(targetSide, targetId);
+
+        const updatedMap = mergeMapData(state.currentMap || {}, {
+          batteries: nextBatteries,
+          utilities: nextUtilities,
+        });
+
+        const stateAfterTransfer = {
+          ...state,
+          mode: "pick_source",
+          cursor: {
+            side: targetSide,
+            index: destinationIndex,
+          },
+          sourceSelection: null,
+          targetSelection: null,
+          batteries: nextBatteries,
+          utilities: nextUtilities,
+          currentMap: updatedMap,
+          transferStatus: {
+            message: `Transferred ${moved} unit${moved === 1 ? "" : "s"} from ${sourceName} to ${destinationName}`,
+            type: "ok",
+          },
+        };
+
+        const goalCheck = evaluateStageGoal(stateAfterTransfer);
+        if (goalCheck.met) {
+          const withLockedGoals = lockCurrentGoalEntities(stateAfterTransfer);
+          if ((withLockedGoals.mapStage ?? -1) >= MAP_STATES.length - 1) {
+            return {
+              ...withLockedGoals,
+              transferStatus: {
+                message: "Goal met. Final stage complete!",
+                type: "ok",
+              },
+            };
+          }
+          const advanced = nextStage(withLockedGoals);
+          return {
+            ...advanced,
+            transferStatus: {
+              message: `Goal met. Stage ${advanced.stage} loaded`,
+              type: "ok",
+            },
+          };
+        }
+
+        return stateAfterTransfer;
+      }
+
+      const sourceSide = state.cursor?.side || "left";
+      const sourceId = getCursorEntityId(state);
+      if (!sourceId) {
+        return state;
+      }
+
+      const sourcePool = sourceSide === "left" ? state.batteries : state.utilities;
+      const source = sourcePool?.[sourceId];
+      const sourceLevel = Math.max(0, source?.level || 0);
+      if (isEntityLocked(state, sourceSide, sourceId)) {
+        const sourceName = getEntityDisplayName(sourceSide, sourceId);
+        return {
+          ...state,
+          transferStatus: {
+            message: `${sourceName} is locked`,
+            type: "error",
+          },
+        };
+      }
+      if (sourceLevel <= 0) {
+        const sourceName = getEntityDisplayName(sourceSide, sourceId);
+        return {
+          ...state,
+          transferStatus: {
+            message: `${sourceName} is empty`,
+            type: "error",
+          },
+        };
+      }
+
+      const { targetSide, targetIds } = getConnectedTargetsForSource(state, sourceSide, sourceId);
+      if (targetIds.length === 0) {
+        return {
+          ...state,
+          transferStatus: {
+            message: "No connected targets",
+            type: "error",
+          },
+        };
+      }
+
+      return {
+        ...state,
+        mode: "pick_target",
+        sourceSelection: { side: sourceSide, id: sourceId },
+        targetSelection: null,
+        cursor: {
+          side: targetSide,
+          index: 0,
+        },
+        transferStatus: {
+          message: "Source locked: choose connected target",
+          type: "ok",
+        },
+      };
+    }
+
+    case "CANCEL_SELECTION": {
+      if (!state.sourceSelection) {
+        return state;
+      }
+
+      const sourceSide = state.sourceSelection.side;
+      const sourceId = state.sourceSelection.id;
+      const ids = getVisibleEntityIds(state, sourceSide);
+      const sourceIndex = Math.max(0, ids.indexOf(sourceId));
+
+      return {
+        ...state,
+        mode: "pick_source",
+        sourceSelection: null,
+        targetSelection: null,
+        cursor: {
+          side: sourceSide,
+          index: sourceIndex,
+        },
+        transferStatus: {
+          message: "Selection canceled",
+          type: "ok",
+        },
+      };
+    }
 
     // case "ACTIVATE_CONTROL": {
     //   const active = CONTROL_ITEMS[state.selectedControlIndex];
@@ -253,40 +826,122 @@ function buildBatteryShapes(state, mapRect) {
   });
 }
 
-function buildSlotAssignments(state, batteryShapes) {
-  const byDirection = state.connections?.[state.junctionDirection] || {};
-  const utilityAnchors = {};
-  const batterySlots = {};
-
-  for (const battery of batteryShapes) {
-    const requestedUtilities = byDirection[battery.id] || [];
-    const slots = Array(UI_NUMBERS.batterySlotCount).fill(null);
-    let slotIndex = 0;
-
-    for (const utilityId of requestedUtilities) {
-      while (slotIndex < UI_NUMBERS.batterySlotCount && slots[slotIndex] !== null) {
-        slotIndex += 1;
+function buildUtilityBatteryIndex(state) {
+  const utilityToBatteries = {};
+  for (const direction of ["up", "down"]) {
+    const byDirection = state.connections?.[direction] || {};
+    for (const batteryId of Object.keys(byDirection)) {
+      for (const utilityId of byDirection[batteryId] || []) {
+        if (!utilityToBatteries[utilityId]) {
+          utilityToBatteries[utilityId] = new Set();
+        }
+        utilityToBatteries[utilityId].add(batteryId);
       }
-      if (slotIndex >= UI_NUMBERS.batterySlotCount) {
-        break;
-      }
-
-      slots[slotIndex] = utilityId;
-      if (!utilityAnchors[utilityId]) {
-        utilityAnchors[utilityId] = {
-          batteryId: battery.id,
-          slotIndex,
-          centerY: battery.slotYs[slotIndex],
-          lineStartX: battery.x + battery.w,
-        };
-      }
-      slotIndex += 1;
     }
-
-    batterySlots[battery.id] = slots;
   }
 
-  return { batterySlots, utilityAnchors };
+  return Object.fromEntries(
+    Object.entries(utilityToBatteries).map(([utilityId, batteryIds]) => [
+      utilityId,
+      Array.from(batteryIds).sort((a, b) => Number(a) - Number(b)),
+    ])
+  );
+}
+
+function buildSlotAssignments(state, batteryShapes) {
+  const batteryById = Object.fromEntries(batteryShapes.map((battery) => [battery.id, battery]));
+  const utilityBatteryIndex = buildUtilityBatteryIndex(state);
+  const utilityAnchors = {};
+  const utilityLineAnchors = {};
+  const batterySlots = {};
+  const usedSlots = {};
+
+  for (const battery of batteryShapes) {
+    batterySlots[battery.id] = Array(UI_NUMBERS.batterySlotCount).fill(null);
+    usedSlots[battery.id] = new Set();
+  }
+
+  // Utilities connected to two adjacent batteries get fixed ports:
+  // bottom of the upper battery and top of the lower battery.
+  for (const utilityId of Object.keys(utilityBatteryIndex).sort((a, b) => a.localeCompare(b))) {
+    const batteryIds = utilityBatteryIndex[utilityId] || [];
+    if (batteryIds.length !== 2) {
+      continue;
+    }
+
+    const upperId = batteryIds[0];
+    const lowerId = batteryIds[1];
+    if (Number(lowerId) - Number(upperId) !== 1) {
+      continue;
+    }
+
+    const upperBattery = batteryById[upperId];
+    const lowerBattery = batteryById[lowerId];
+    if (!upperBattery || !lowerBattery) {
+      continue;
+    }
+
+    const upperSlotIndex = UI_NUMBERS.batterySlotCount - 1;
+    const lowerSlotIndex = 0;
+    usedSlots[upperId].add(upperSlotIndex);
+    usedSlots[lowerId].add(lowerSlotIndex);
+    batterySlots[upperId][upperSlotIndex] = utilityId;
+    batterySlots[lowerId][lowerSlotIndex] = utilityId;
+
+    const anchors = [
+      {
+        batteryId: upperId,
+        slotIndex: upperSlotIndex,
+        centerY: upperBattery.slotYs[upperSlotIndex],
+        lineStartX: upperBattery.x + upperBattery.w,
+      },
+      {
+        batteryId: lowerId,
+        slotIndex: lowerSlotIndex,
+        centerY: lowerBattery.slotYs[lowerSlotIndex],
+        lineStartX: lowerBattery.x + lowerBattery.w,
+      },
+    ];
+
+    utilityLineAnchors[utilityId] = anchors;
+    utilityAnchors[utilityId] = {
+      centerY: Math.round((anchors[0].centerY + anchors[1].centerY) / 2),
+    };
+  }
+
+  for (const utilityId of Object.keys(utilityBatteryIndex).sort((a, b) => a.localeCompare(b))) {
+    if (utilityAnchors[utilityId]) {
+      continue;
+    }
+
+    const batteryIds = utilityBatteryIndex[utilityId] || [];
+    const batteryId = batteryIds.find((id) => Boolean(batteryById[id]));
+    if (!batteryId) {
+      continue;
+    }
+
+    const battery = batteryById[batteryId];
+    let slotIndex = 0;
+    while (slotIndex < UI_NUMBERS.batterySlotCount && usedSlots[batteryId].has(slotIndex)) {
+      slotIndex += 1;
+    }
+    if (slotIndex >= UI_NUMBERS.batterySlotCount) {
+      slotIndex = 0;
+    }
+
+    usedSlots[batteryId].add(slotIndex);
+    batterySlots[batteryId][slotIndex] = utilityId;
+    const anchor = {
+      batteryId,
+      slotIndex,
+      centerY: battery.slotYs[slotIndex],
+      lineStartX: battery.x + battery.w,
+    };
+    utilityLineAnchors[utilityId] = [anchor];
+    utilityAnchors[utilityId] = { centerY: anchor.centerY };
+  }
+
+  return { batterySlots, utilityAnchors, utilityLineAnchors };
 }
 
 function buildUtilityShapes(state, mapRect, slotAssignments) {
@@ -343,21 +998,27 @@ function buildUtilityShapes(state, mapRect, slotAssignments) {
   }));
 }
 
-function buildUtilityLines(utilityShapes, slotAssignments) {
-  const utilityAnchors = slotAssignments?.utilityAnchors || {};
+function buildUtilityLines(state, utilityShapes, slotAssignments) {
+  const utilityLineAnchors = slotAssignments?.utilityLineAnchors || {};
+  const byDirection = state.connections?.[state.junctionDirection] || {};
   const lines = [];
 
   for (const utility of utilityShapes) {
-    const anchor = utilityAnchors[utility.id];
-    if (!anchor || utility.cells.length === 0) {
+    const anchors = utilityLineAnchors[utility.id] || [];
+    if (anchors.length === 0 || utility.cells.length === 0) {
       continue;
     }
-    lines.push({
-      x1: anchor.lineStartX,
-      y1: anchor.centerY,
-      x2: utility.cells[0].x - UI_NUMBERS.utilityLineGapBeforeCellsPx,
-      y2: utility.lineY,
-    });
+
+    for (const anchor of anchors) {
+      const activeTargets = byDirection[anchor.batteryId] || [];
+      lines.push({
+        x1: anchor.lineStartX,
+        y1: anchor.centerY,
+        x2: utility.cells[0].x - UI_NUMBERS.utilityLineGapBeforeCellsPx,
+        y2: utility.lineY,
+        isActive: activeTargets.includes(utility.id),
+      });
+    }
   }
 
   return lines;
@@ -369,6 +1030,30 @@ function buildViewModel(state, innerRectPx) {
   const batteries = buildBatteryShapes(state, mapRect);
   const slotAssignments = buildSlotAssignments(state, batteries);
   const utilities = buildUtilityShapes(state, mapRect, slotAssignments);
+  const batteryIds = getSelectableIdsForSide(state, "left");
+  const utilityIds = getSelectableIdsForSide(state, "right");
+  const cursorSide = state.cursor?.side || "left";
+  const cursorIndex = state.cursor?.index || 0;
+  const selectedBatteryId = cursorSide === "left"
+    ? batteryIds[normalizeCursorIndex(cursorIndex, batteryIds.length)]
+    : null;
+  const selectedUtilityId = cursorSide === "right"
+    ? utilityIds[normalizeCursorIndex(cursorIndex, utilityIds.length)]
+    : null;
+  const lockedBatteryId = state.sourceSelection?.side === "left" ? state.sourceSelection.id : null;
+  const lockedUtilityId = state.sourceSelection?.side === "right" ? state.sourceSelection.id : null;
+  const validTargets = state.sourceSelection
+    ? getConnectedTargetsForSource(state, state.sourceSelection.side, state.sourceSelection.id)
+    : { targetSide: null, targetIds: [] };
+  const validTargetBatteryIds = validTargets.targetSide === "left" ? validTargets.targetIds : [];
+  const validTargetUtilityIds = validTargets.targetSide === "right" ? validTargets.targetIds : [];
+  const goalLockedBatteryIds = batteries
+    .map((battery) => battery.id)
+    .filter((id) => isEntityLocked(state, "left", id));
+  const goalLockedUtilityIds = utilities
+    .map((utility) => utility.id)
+    .filter((id) => isEntityLocked(state, "right", id));
+  const goalText = buildGoalStatusText(state);
 
   return {
     mapPanel: {
@@ -376,12 +1061,20 @@ function buildViewModel(state, innerRectPx) {
       rect: mapRect,
       batteries,
       utilities,
-      utilityLines: buildUtilityLines(utilities, slotAssignments),
+      utilityLines: buildUtilityLines(state, utilities, slotAssignments),
+      selectedBatteryId,
+      selectedUtilityId,
+      lockedBatteryId,
+      lockedUtilityId,
+      validTargetBatteryIds,
+      validTargetUtilityIds,
+      goalLockedBatteryIds,
+      goalLockedUtilityIds,
     },
     statusPanel: {
       title: "Status",
       rect: statusRect,
-      statusLine: `Stage ${state.stage} | Mode ${state.mode} | Junction ${state.junctionDirection}`,
+      statusLine: `Stage ${state.stage} | Mode ${state.mode} | Junction ${state.junctionDirection} | Goal: ${goalText}`,
       status: state.transferStatus,
     },
     debugLayout: state.debugLayout,
@@ -412,9 +1105,13 @@ function drawPanelFrame(scene, rect, title) {
   });
 }
 
-function drawBatteryGlyph(scene, battery) {
-  const stroke = parseInt(UI_COLORS.body.replace("#", ""), 16);
-  const filled = parseInt(UI_COLORS.header.replace("#", ""), 16);
+function drawBatteryGlyph(scene, battery, isSelected = false, isLocked = false, isValidTarget = false, isGoalLocked = false) {
+  const stroke = parseInt((isGoalLocked ? UI_COLORS.goalLocked : UI_COLORS.body).replace("#", ""), 16);
+  const filled = parseInt((isGoalLocked ? UI_COLORS.goalLocked : UI_COLORS.header).replace("#", ""), 16);
+  const cursor = parseInt(UI_COLORS.cursor.replace("#", ""), 16);
+  const locked = parseInt(UI_COLORS.locked.replace("#", ""), 16);
+  const validTarget = parseInt(UI_COLORS.validTarget.replace("#", ""), 16);
+  const goalLocked = parseInt(UI_COLORS.goalLocked.replace("#", ""), 16);
 
   const g = scene.add.graphics();
   g.lineStyle(UI_NUMBERS.strokeWidth, stroke, UI_NUMBERS.strokeAlpha);
@@ -447,6 +1144,39 @@ function drawBatteryGlyph(scene, battery) {
     }
   }
 
+  if (isSelected) {
+    g.lineStyle(UI_NUMBERS.cursorHighlightWidthPx, cursor, UI_NUMBERS.cursorHighlightAlpha);
+    g.strokeRoundedRect(
+      battery.x - UI_NUMBERS.cursorHighlightInsetPx,
+      battery.y - UI_NUMBERS.cursorHighlightInsetPx,
+      battery.w + UI_NUMBERS.cursorHighlightInsetPx * 2,
+      battery.h + UI_NUMBERS.cursorHighlightInsetPx * 2,
+      UI_NUMBERS.batteryBodyCornerRadiusPx
+    );
+  }
+
+  if (isValidTarget) {
+    g.lineStyle(UI_NUMBERS.validTargetHighlightWidthPx, validTarget, UI_NUMBERS.validTargetHighlightAlpha);
+    g.strokeRoundedRect(
+      battery.x - UI_NUMBERS.validTargetHighlightInsetPx,
+      battery.y - UI_NUMBERS.validTargetHighlightInsetPx,
+      battery.w + UI_NUMBERS.validTargetHighlightInsetPx * 2,
+      battery.h + UI_NUMBERS.validTargetHighlightInsetPx * 2,
+      UI_NUMBERS.batteryBodyCornerRadiusPx
+    );
+  }
+
+  if (isLocked) {
+    g.lineStyle(UI_NUMBERS.lockedHighlightWidthPx, locked, UI_NUMBERS.lockedHighlightAlpha);
+    g.strokeRoundedRect(
+      battery.x - UI_NUMBERS.lockedHighlightInsetPx,
+      battery.y - UI_NUMBERS.lockedHighlightInsetPx,
+      battery.w + UI_NUMBERS.lockedHighlightInsetPx * 2,
+      battery.h + UI_NUMBERS.lockedHighlightInsetPx * 2,
+      UI_NUMBERS.batteryBodyCornerRadiusPx
+    );
+  }
+
   scene.ui.add(g);
 
   const labelStyle = {
@@ -460,9 +1190,13 @@ function drawBatteryGlyph(scene, battery) {
   });
 }
 
-function drawUtilityGlyph(scene, utility) {
-  const stroke = parseInt(UI_COLORS.body.replace("#", ""), 16);
-  const filled = parseInt(UI_COLORS.header.replace("#", ""), 16);
+function drawUtilityGlyph(scene, utility, isSelected = false, isLocked = false, isValidTarget = false, isGoalLocked = false) {
+  const stroke = parseInt((isGoalLocked ? UI_COLORS.goalLocked : UI_COLORS.body).replace("#", ""), 16);
+  const filled = parseInt((isGoalLocked ? UI_COLORS.goalLocked : UI_COLORS.header).replace("#", ""), 16);
+  const cursor = parseInt(UI_COLORS.cursor.replace("#", ""), 16);
+  const locked = parseInt(UI_COLORS.locked.replace("#", ""), 16);
+  const validTarget = parseInt(UI_COLORS.validTarget.replace("#", ""), 16);
+  const goalLocked = parseInt(UI_COLORS.goalLocked.replace("#", ""), 16);
 
   const g = scene.add.graphics();
   g.lineStyle(UI_NUMBERS.strokeWidth, stroke, UI_NUMBERS.strokeAlpha);
@@ -485,6 +1219,58 @@ function drawUtilityGlyph(scene, utility) {
       );
     }
   }
+
+  if (isSelected && utility.cells.length > 0) {
+    const firstCell = utility.cells[0];
+    const lastCell = utility.cells[utility.cells.length - 1];
+    const blockX = firstCell.x;
+    const blockY = firstCell.y;
+    const blockW = (lastCell.x - firstCell.x) + UI_NUMBERS.utilityCellSizePx;
+    const blockH = UI_NUMBERS.utilityCellSizePx;
+    g.lineStyle(UI_NUMBERS.cursorHighlightWidthPx, cursor, UI_NUMBERS.cursorHighlightAlpha);
+    g.strokeRoundedRect(
+      blockX - UI_NUMBERS.cursorHighlightInsetPx,
+      blockY - UI_NUMBERS.cursorHighlightInsetPx,
+      blockW + UI_NUMBERS.cursorHighlightInsetPx * 2,
+      blockH + UI_NUMBERS.cursorHighlightInsetPx * 2,
+      UI_NUMBERS.utilityCellCornerRadiusPx
+    );
+  }
+
+  if (isValidTarget && utility.cells.length > 0) {
+    const firstCell = utility.cells[0];
+    const lastCell = utility.cells[utility.cells.length - 1];
+    const blockX = firstCell.x;
+    const blockY = firstCell.y;
+    const blockW = (lastCell.x - firstCell.x) + UI_NUMBERS.utilityCellSizePx;
+    const blockH = UI_NUMBERS.utilityCellSizePx;
+    g.lineStyle(UI_NUMBERS.validTargetHighlightWidthPx, validTarget, UI_NUMBERS.validTargetHighlightAlpha);
+    g.strokeRoundedRect(
+      blockX - UI_NUMBERS.validTargetHighlightInsetPx,
+      blockY - UI_NUMBERS.validTargetHighlightInsetPx,
+      blockW + UI_NUMBERS.validTargetHighlightInsetPx * 2,
+      blockH + UI_NUMBERS.validTargetHighlightInsetPx * 2,
+      UI_NUMBERS.utilityCellCornerRadiusPx
+    );
+  }
+
+  if (isLocked && utility.cells.length > 0) {
+    const firstCell = utility.cells[0];
+    const lastCell = utility.cells[utility.cells.length - 1];
+    const blockX = firstCell.x;
+    const blockY = firstCell.y;
+    const blockW = (lastCell.x - firstCell.x) + UI_NUMBERS.utilityCellSizePx;
+    const blockH = UI_NUMBERS.utilityCellSizePx;
+    g.lineStyle(UI_NUMBERS.lockedHighlightWidthPx, locked, UI_NUMBERS.lockedHighlightAlpha);
+    g.strokeRoundedRect(
+      blockX - UI_NUMBERS.lockedHighlightInsetPx,
+      blockY - UI_NUMBERS.lockedHighlightInsetPx,
+      blockW + UI_NUMBERS.lockedHighlightInsetPx * 2,
+      blockH + UI_NUMBERS.lockedHighlightInsetPx * 2,
+      UI_NUMBERS.utilityCellCornerRadiusPx
+    );
+  }
+
   scene.ui.add(g);
 
   const labelStyle = {
@@ -504,8 +1290,9 @@ function drawUtilityLines(scene, lines) {
   }
   const stroke = parseInt(UI_COLORS.body.replace("#", ""), 16);
   const g = scene.add.graphics();
-  g.lineStyle(UI_NUMBERS.utilityLineWidthPx, stroke, UI_NUMBERS.strokeAlpha);
   for (const line of lines) {
+    const alpha = line.isActive ? UI_NUMBERS.utilityLineActiveAlpha : UI_NUMBERS.utilityLineInactiveAlpha;
+    g.lineStyle(UI_NUMBERS.utilityLineWidthPx, stroke, alpha);
     g.lineBetween(line.x1, line.y1, line.x2, line.y2);
   }
   scene.ui.add(g);
@@ -516,11 +1303,25 @@ function renderFromViewModel(scene, viewModel) {
   drawPanelFrame(scene, viewModel.statusPanel.rect, viewModel.statusPanel.title);
 
   for (const battery of viewModel.mapPanel.batteries) {
-    drawBatteryGlyph(scene, battery);
+    drawBatteryGlyph(
+      scene,
+      battery,
+      battery.id === viewModel.mapPanel.selectedBatteryId,
+      battery.id === viewModel.mapPanel.lockedBatteryId,
+      viewModel.mapPanel.validTargetBatteryIds.includes(battery.id),
+      viewModel.mapPanel.goalLockedBatteryIds.includes(battery.id)
+    );
   }
   drawUtilityLines(scene, viewModel.mapPanel.utilityLines);
   for (const utility of viewModel.mapPanel.utilities) {
-    drawUtilityGlyph(scene, utility);
+    drawUtilityGlyph(
+      scene,
+      utility,
+      utility.id === viewModel.mapPanel.selectedUtilityId,
+      utility.id === viewModel.mapPanel.lockedUtilityId,
+      viewModel.mapPanel.validTargetUtilityIds.includes(utility.id),
+      viewModel.mapPanel.goalLockedUtilityIds.includes(utility.id)
+    );
   }
 
   const baseFontPx = scene.registry.get("fontSizePx") || UI_NUMBERS.baseFontPxFallback;
@@ -544,6 +1345,11 @@ function renderFromViewModel(scene, viewModel) {
     offsetYPx: viewModel.statusPanel.rect.y + Math.max(UI_NUMBERS.strokeWidth, Math.round(viewModel.statusPanel.rect.height * UI_NUMBERS.statusMessageOffsetRatio)),
     textStyle: statusStyle,
   });
+
+  // DEBUG
+  if (viewModel.debugLayout) {
+    drawLayoutDebug(this, innerRectPx, MAP_RECT_PCT, STATUS_RECT_PCT);
+  }
 }
 
 export default class RefactoredMap extends Phaser.Scene {
@@ -565,20 +1371,40 @@ export default class RefactoredMap extends Phaser.Scene {
   }
 
   bindInput() {
-    // this.input.keyboard.on("keydown-UP", () => {
-    //   this.dispatch({ type: "MOVE_CONTROL_SELECTION", payload: { direction: "up" } });
-    // });
+    this.input.keyboard.on("keydown-UP", () => {
+      this.dispatch({ type: "MOVE_CURSOR", payload: { direction: "up" } });
+    });
 
-    // this.input.keyboard.on("keydown-DOWN", () => {
-    //   this.dispatch({ type: "MOVE_CONTROL_SELECTION", payload: { direction: "down" } });
-    // });
+    this.input.keyboard.on("keydown-DOWN", () => {
+      this.dispatch({ type: "MOVE_CURSOR", payload: { direction: "down" } });
+    });
 
-    // this.input.keyboard.on("keydown-ENTER", () => {
-    //   this.dispatch({ type: "ACTIVATE_CONTROL" });
-    // });
+    this.input.keyboard.on("keydown-LEFT", () => {
+      this.dispatch({ type: "MOVE_CURSOR", payload: { direction: "left" } });
+    });
+
+    this.input.keyboard.on("keydown-RIGHT", () => {
+      this.dispatch({ type: "MOVE_CURSOR", payload: { direction: "right" } });
+    });
+
+    this.input.keyboard.on("keydown-ENTER", () => {
+      this.dispatch({ type: "CONFIRM_SELECTION" });
+    });
+
+    this.input.keyboard.on("keydown-ESC", () => {
+      this.dispatch({ type: "CANCEL_SELECTION" });
+    });
 
     this.input.keyboard.on("keydown-Q", () => {
       this.dispatch({ type: "TOGGLE_DEBUG_LAYOUT" });
+    });
+
+    this.input.keyboard.on("keydown-J", () => {
+      this.dispatch({ type: "TOGGLE_JUNCTION" });
+    });
+
+    this.input.keyboard.on("keydown-N", () => {
+      this.dispatch({ type: "NEXT_STAGE" });
     });
   }
 
@@ -599,8 +1425,8 @@ export default class RefactoredMap extends Phaser.Scene {
 
     const viewModel = buildViewModel(this.gameState, innerRectPx);
     renderFromViewModel(this, viewModel);
-    if (viewModel.debugLayout) {
-      drawLayoutDebug(this, innerRectPx, MAP_RECT_PCT, STATUS_RECT_PCT);
-    }
+    // if (viewModel.debugLayout) {
+    //   drawLayoutDebug(this, innerRectPx, MAP_RECT_PCT, STATUS_RECT_PCT);
+    // }
   }
 }
