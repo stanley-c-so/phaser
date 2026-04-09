@@ -91,6 +91,7 @@ const UI_NUMBERS = {
   statusMessageOffsetRatio: 0.55,
   statusInfoOffsetXPx: 120,
   statusInfoOffsetYPx: 10,
+  statusTypeCharIntervalMs: 18,
 };
 
 const UI_COLORS = {
@@ -1340,11 +1341,13 @@ function renderFromViewModel(scene, viewModel) {
     ...makeTextStyle(Math.max(UI_NUMBERS.minBodyFontPx, Math.round(baseFontPx * UI_NUMBERS.bodyFontScale))),
     color: statusColor,
   };
-  draw.bind(scene)(`Status: ${viewModel.statusPanel.status.message || ""}`, {
+  const displayedStatusMessage = scene.getDisplayedStatusMessage(viewModel.statusPanel.status.message || "");
+  const statusText = draw.bind(scene)(`Status: ${displayedStatusMessage}`, {
     offsetXPx: viewModel.statusPanel.rect.x + UI_NUMBERS.panelTextOffsetXPx,
     offsetYPx: viewModel.statusPanel.rect.y + Math.max(UI_NUMBERS.strokeWidth, Math.round(viewModel.statusPanel.rect.height * UI_NUMBERS.statusMessageOffsetRatio)),
     textStyle: statusStyle,
   });
+  scene.statusMessageText = statusText;
 
   // DEBUG
   if (viewModel.debugLayout) {
@@ -1357,6 +1360,11 @@ export default class RefactoredMap extends Phaser.Scene {
     super("RefactoredMap");
     this.gameState = createInitialGameState();
     this.ui = null;
+    this.statusMessageText = null;
+    this.statusTypingEvent = null;
+    this.statusTargetMessage = "";
+    this.statusTypedMessage = "";
+    this.statusTypedLength = 0;
   }
 
   create() {
@@ -1364,10 +1372,79 @@ export default class RefactoredMap extends Phaser.Scene {
     this.bindInput();
     this.render();
 
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.clearStatusTypingEvent();
+    });
+
+    this.events.once(Phaser.Scenes.Events.DESTROY, () => {
+      this.clearStatusTypingEvent();
+    });
+
     this.scale.on("resize", () => {
       updateRegistryFromScale(this);
       this.render();
     });
+  }
+
+  clearStatusTypingEvent() {
+    if (this.statusTypingEvent) {
+      this.statusTypingEvent.remove(false);
+      this.statusTypingEvent = null;
+    }
+  }
+
+  applyTypedStatusToText() {
+    if (!this.statusMessageText || !this.statusMessageText.active) {
+      return;
+    }
+    this.statusMessageText.setText(`Status: ${this.statusTypedMessage}`);
+  }
+
+  syncStatusTypingTarget(message) {
+    const nextMessage = String(message || "");
+    if (nextMessage === this.statusTargetMessage) {
+      return;
+    }
+
+    this.clearStatusTypingEvent();
+    this.statusTargetMessage = nextMessage;
+    this.statusTypedMessage = "";
+    this.statusTypedLength = 0;
+
+    if (nextMessage.length === 0) {
+      return;
+    }
+
+    // Show first character immediately, then type the rest quickly.
+    this.statusTypedLength = 1;
+    this.statusTypedMessage = nextMessage.slice(0, this.statusTypedLength);
+    if (this.statusTypedLength >= nextMessage.length) {
+      return;
+    }
+
+    this.statusTypingEvent = this.time.addEvent({
+      delay: UI_NUMBERS.statusTypeCharIntervalMs,
+      loop: true,
+      callback: () => {
+        if (this.statusTargetMessage !== nextMessage) {
+          return;
+        }
+
+        this.statusTypedLength = Math.min(nextMessage.length, this.statusTypedLength + 1);
+        this.statusTypedMessage = nextMessage.slice(0, this.statusTypedLength);
+
+        if (this.statusTypedLength >= nextMessage.length) {
+          this.clearStatusTypingEvent();
+        }
+
+        this.applyTypedStatusToText();
+      },
+    });
+  }
+
+  getDisplayedStatusMessage(rawMessage) {
+    this.syncStatusTypingTarget(rawMessage);
+    return this.statusTypedMessage;
   }
 
   bindInput() {
@@ -1415,6 +1492,7 @@ export default class RefactoredMap extends Phaser.Scene {
   }
 
   render() {
+    this.statusMessageText = null;
     this.ui?.removeAll(true);
     this.ui = this.add.container(0, 0);
 
