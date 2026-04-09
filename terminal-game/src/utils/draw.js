@@ -63,7 +63,9 @@ export function draw(
   const x = Math.round(offsetXPx);
   const y = Math.round(offsetYPx);
   const text = this.add.text(x, y, content, textStyle);
-  text.setResolution(1);
+  text.setOrigin(0, 0);
+  // Match the renderer resolution to avoid sub-pixel scaling artifacts on HiDPI / fractional DPI.
+  text.setResolution(this.game?.renderer?.resolution || 1);
   if (lineSpacing !== undefined) text.setLineSpacing(Math.round(lineSpacing));
   this.ui.add(text);
   return text;

@@ -1,13 +1,23 @@
 import Phaser from "phaser";
 
 import { COLORS } from "./config/constants";
-import StaticMap from "./scenes/StaticMap";
+import RefactoredMap from "./scenes/RefactoredMap";
+
+const MAP = {
+  scene: RefactoredMap,
+  label: "RefactoredMap",
+}
 
 const config = {
   type: Phaser.AUTO,
   backgroundColor: COLORS.BG,
+  // Use devicePixelRatio to avoid fractional CSS scaling causing text metric drift on Windows DPI settings.
+  resolution: window.devicePixelRatio || 1,
+  render: {
+    roundPixels: true,
+  },
   scene: [
-    StaticMap,
+    MAP.scene,
   ],
   scale: {
     // mode: Phaser.Scale.FIT,
@@ -56,7 +66,7 @@ async function startStaticMapWhenFontsReady() {
   }
 
   try {
-    game.scene.start("StaticMap");
+    game.scene.start(MAP.label);
   } catch (e) {
     console.error(e);
   }

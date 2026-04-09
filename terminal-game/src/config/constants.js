@@ -19,8 +19,8 @@ function deriveDiagramMinGrid() {
 export const DIAGRAM_MIN_GRID = deriveDiagramMinGrid();
 
 export const EXTRA_MARGINS_IN_PX = {
-  top: 50,
-  bottom: 50,
+  top: 25,
+  bottom: 25,
   left: 0,
   right: 0,
 };
@@ -33,7 +33,10 @@ export const COLORS = {
 
 export const TEXT_STYLE_BASE = {
   fontFamily: "Consolas, 'Lucida Console', 'Courier New', 'Cascadia Mono', 'Cascadia Code', 'DejaVu Sans Mono', monospace",
+  fontStyle: "normal",
+  fontWeight: "normal",
   color: COLORS.TEXT,
+  padding: { top: 0, left: 0, bottom: 0, right: 0 },
 };
 
 export const TITLE_FONT_SCALE = 1.5;
@@ -42,6 +45,5 @@ export function makeTextStyle(cellSizePx) {
   return {
     ...TEXT_STYLE_BASE,
     fontSize: `${cellSizePx}px`,
-    lineHeight: cellSizePx,
   };
 }
