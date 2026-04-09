@@ -7,7 +7,7 @@ export const MAP_STATE_1 = {
     A: { level: 1, capacity: 5 },
     B: { level: 2, capacity: 3 },
     C: { level: 3, capacity: 3 },
-    D: { level: 0, capacity: 4 },
+    D: { level: 0, capacity: 2 },
   },
   batteries: {
     "1": { level: 0, capacity: 4 },
@@ -27,8 +27,7 @@ export const MAP_STATE_1 = {
 
 export const MAP_STATE_2 = {
   utilities: {
-    // D: { level: 0, capacity: 4 },
-    E: { level: 3, capacity: 3 },
+    E: { level: 2, capacity: 2 },
   },
   batteries: {
     "2": { level: 0, capacity: 4 },
@@ -44,7 +43,8 @@ export const MAP_STATE_2 = {
     },
   },
   goal: {
-    D: 4,
+    D: 2,
+    E: 1,
   },
 };
 
