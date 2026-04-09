@@ -1,12 +1,9 @@
 import Phaser from "phaser";
 
 import { COLORS } from "./config/constants";
-import StaticMap from "./scenes/StaticMap";
 import RefactoredMap from "./scenes/RefactoredMap";
 
 const MAP = {
-  // scene: StaticMap,
-  // label: "StaticMap",
   scene: RefactoredMap,
   label: "RefactoredMap",
 }
