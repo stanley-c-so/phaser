@@ -31,6 +31,14 @@ export const COLORS = {
   TEXT: "#00ff00",
 };
 
+export const MQTT = {
+  // Browser clients must use a WebSocket listener from your broker.
+  // Override in `.env` as `VITE_MQTT_URL` if needed.
+  // URL: import.meta.env.VITE_MQTT_URL || "ws://localhost:1883",
+  URL: import.meta.env.VITE_MQTT_URL || "ws://localhost:9001",
+  TOPIC: import.meta.env.VITE_MQTT_TOPIC || "terminal-game/events",
+};
+
 export const TEXT_STYLE_BASE = {
   fontFamily: "Consolas, 'Lucida Console', 'Courier New', 'Cascadia Mono', 'Cascadia Code', 'DejaVu Sans Mono', monospace",
   fontStyle: "normal",

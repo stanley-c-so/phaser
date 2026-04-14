@@ -1,7 +1,8 @@
 import Phaser from "phaser";
 
-import { COLORS } from "./config/constants";
+import { COLORS, MQTT } from "./config/constants";
 import RefactoredMap from "./scenes/RefactoredMap";
+import { initMqtt } from "./utils/mqtt";
 
 const MAP = {
   scene: RefactoredMap,
@@ -27,6 +28,27 @@ const config = {
 };
 
 const game = new Phaser.Game(config);
+
+const mqttRuntime = initMqtt({
+  url: MQTT.URL,
+  topic: MQTT.TOPIC,
+  onConnect: () => {
+    console.log(`MQTT connected: ${MQTT.URL}`);
+  },
+  onMessage: ({ topic, payload }) => {
+    console.log(`[MQTT] ${topic}: ${payload}`);
+  },
+});
+
+// Convenience hooks for quick testing in the browser console.
+window.mqttPublish = (payload, topic = MQTT.TOPIC) => {
+  mqttRuntime.publish(topic, payload);
+};
+window.mqttSubscribe = (topic) => {
+  mqttRuntime.subscribe(topic, (subscribedTopic) => {
+    console.log(`MQTT subscribed: ${subscribedTopic}`);
+  });
+};
 
 // Kill page scrolling caused by an oversized canvas
 document.documentElement.style.overflow = "hidden";

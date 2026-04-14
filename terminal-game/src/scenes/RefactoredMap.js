@@ -458,20 +458,27 @@ function reduceGameState(state, intent) {
       const goalCheck = evaluateStageGoal(stateAfterTransfer);
       if (goalCheck.met) {
         const withLockedGoals = lockCurrentGoalEntities(stateAfterTransfer);
-        if ((withLockedGoals.mapStage ?? -1) >= MAP_STATES.length - 1) {
-          return {
-            ...withLockedGoals,
-            transferStatus: {
-              message: "Goal met. Final stage complete!",
-              type: "ok",
-            },
-          };
-        }
-        const advanced = nextStage(withLockedGoals);
+        // if ((withLockedGoals.mapStage ?? -1) >= MAP_STATES.length - 1) {
+        //   return {
+        //     ...withLockedGoals,
+        //     transferStatus: {
+        //       message: "Goal met. Final stage complete!",
+        //       type: "ok",
+        //     },
+        //   };
+        // }
+        // const advanced = nextStage(withLockedGoals);
+        // return {
+        //   ...advanced,
+        //   transferStatus: {
+        //     message: `Goal met. Stage ${advanced.stage} loaded`,
+        //     type: "ok",
+        //   },
+        // };
         return {
-          ...advanced,
+          ...withLockedGoals,
           transferStatus: {
-            message: `Goal met. Stage ${advanced.stage} loaded`,
+            message: "Goal met.",
             type: "ok",
           },
         };
